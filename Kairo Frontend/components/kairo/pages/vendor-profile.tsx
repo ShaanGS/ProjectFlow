@@ -127,13 +127,13 @@ export function VendorProfilePage({ vendorId }: VendorProfilePageProps) {
   const vendor = vendorData[vendorId] || vendorData.razorpay
 
   return (
-    <div className="flex-1 overflow-y-auto px-10 pt-8">
+    <div className="flex-1 overflow-y-auto bg-white px-8 py-8">
       {/* Vendor Header */}
-      <div className="mb-6 rounded-lg border border-border bg-background p-6">
+      <div className="mb-8 rounded-lg border border-gray-100 bg-white p-8 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-foreground">{vendor.name}</h2>
-            <p className="text-[13px] text-muted-foreground">{vendor.incidentsLogged} incidents logged</p>
+            <h2 className="text-xl font-semibold tracking-tight text-gray-900">{vendor.name}</h2>
+            <p className="mt-1 text-[13px] text-gray-500">{vendor.incidentsLogged} incidents logged</p>
           </div>
           <div className="flex items-center gap-4">
             <StatChip label={`${vendor.memoryMonths} months memory`} />
@@ -144,25 +144,25 @@ export function VendorProfilePage({ vendorId }: VendorProfilePageProps) {
       </div>
 
       {/* Failure Patterns */}
-      <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9B9B9B]">
+      <h3 className="mb-4 text-xl font-semibold tracking-tight text-gray-900">
         Failure Patterns
       </h3>
-      <div className="mb-8 grid grid-cols-3 gap-4">
+      <div className="mb-10 grid grid-cols-3 gap-8">
         {vendor.patterns.map((pattern) => (
-          <div key={pattern.id} className="rounded-lg border border-border bg-background p-4">
-            <h4 className="mb-2 text-[14px] font-medium text-foreground">{pattern.name}</h4>
-            <div className="mb-3 flex items-center gap-2">
+          <div key={pattern.id} className="rounded-lg border border-gray-100 bg-white p-8 shadow-sm">
+            <h4 className="mb-3 text-[14px] font-semibold text-gray-900">{pattern.name}</h4>
+            <div className="mb-4 flex items-center gap-2">
               <div className="flex-1">
-                <div className="h-2 w-full rounded-full bg-muted">
+                <div className="h-2 w-full rounded-full bg-gray-200">
                   <div
-                    className="h-2 rounded-full bg-accent"
+                    className="h-2 rounded-full bg-teal-600"
                     style={{ width: `${pattern.confidence}%` }}
                   />
                 </div>
               </div>
-              <span className="text-[13px] font-semibold text-foreground">{pattern.confidence}%</span>
+              <span className="text-[13px] font-bold text-gray-900">{pattern.confidence}%</span>
             </div>
-            <div className="flex items-center justify-between text-[12px] text-muted-foreground">
+            <div className="flex items-center justify-between text-[12px] text-gray-600">
               <span>Fired {pattern.triggerCount} times</span>
               <span>Last: {pattern.lastFired}</span>
             </div>
@@ -171,11 +171,11 @@ export function VendorProfilePage({ vendorId }: VendorProfilePageProps) {
       </div>
 
       {/* Incident History */}
-      <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9B9B9B]">
+      <h3 className="mb-4 text-xl font-semibold tracking-tight text-gray-900">
         Incident History
       </h3>
-      <div className="mb-8 rounded-lg border border-border">
-        <div className="flex items-center border-b border-border px-4 py-2 text-[13px] text-muted-foreground">
+      <div className="mb-10 rounded-lg border border-gray-100 bg-white shadow-sm">
+        <div className="flex items-center border-b border-gray-100 px-6 py-4 text-[12px] font-semibold uppercase tracking-wide text-gray-500">
           <div className="w-6" />
           <div className="flex-1">Incident name</div>
           <div className="w-20">Status</div>
@@ -186,37 +186,37 @@ export function VendorProfilePage({ vendorId }: VendorProfilePageProps) {
         {vendor.incidents.map((incident) => (
           <div
             key={incident.id}
-            className="flex items-center border-b border-border px-4 py-3 last:border-b-0 hover:bg-muted/50"
+            className="flex items-center border-b border-gray-100 px-6 py-4 last:border-b-0 transition-colors hover:bg-gray-50/80"
           >
             <div className="w-6">
               <div
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  incident.status === "live" ? "bg-destructive" : "bg-muted-foreground"
+                  incident.status === "live" ? "bg-red-600" : "bg-gray-400"
                 )}
               />
             </div>
-            <div className="flex-1 text-[13px] font-medium text-foreground">{incident.name}</div>
+            <div className="flex-1 text-[13px] font-medium text-gray-900">{incident.name}</div>
             <div className="w-20">
               <span
                 className={cn(
-                  "rounded px-2 py-0.5 text-[12px] font-medium",
+                  "rounded px-2.5 py-1 text-[12px] font-semibold",
                   incident.status === "live"
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-[#00A651]/10 text-[#00A651]"
+                    ? "bg-red-50 text-red-700 border border-red-100"
+                    : "bg-green-50 text-green-700 border border-green-100"
                 )}
               >
                 {incident.status === "live" ? "Live" : "Resolved"}
               </span>
             </div>
-            <div className="w-28 text-[13px] text-muted-foreground">{incident.time}</div>
+            <div className="w-28 text-[13px] text-gray-500">{incident.time}</div>
             <div className="w-24">
               <span className="rounded-md bg-accent/10 px-2 py-0.5 text-[12px] font-medium text-accent">
                 {incident.memoryMatches} {incident.memoryMatches === 1 ? "match" : "matches"}
               </span>
             </div>
             <div className="w-8">
-              <button className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+              <button className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-900">
                 <MoreHorizontal className="h-4 w-4" />
               </button>
             </div>
@@ -225,11 +225,11 @@ export function VendorProfilePage({ vendorId }: VendorProfilePageProps) {
       </div>
 
       {/* Memory Entries */}
-      <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9B9B9B]">
+      <h3 className="mb-4 text-xl font-semibold tracking-tight text-gray-900">
         Memory Entries
       </h3>
-      <div className="rounded-lg border border-border">
-        <div className="flex items-center border-b border-border px-4 py-2 text-[13px] text-muted-foreground">
+      <div className="rounded-lg border border-gray-100 bg-white shadow-sm">
+        <div className="flex items-center border-b border-gray-100 px-6 py-4 text-[12px] font-semibold uppercase tracking-wide text-gray-500">
           <div className="w-28">Date</div>
           <div className="flex-1">Incident summary</div>
           <div className="w-[300px]">What was retained</div>
@@ -238,11 +238,11 @@ export function VendorProfilePage({ vendorId }: VendorProfilePageProps) {
         {vendor.memoryEntries.map((entry) => (
           <div
             key={entry.id}
-            className="flex items-center border-b border-border px-4 py-3 last:border-b-0 hover:bg-muted/50"
+            className="flex items-center border-b border-gray-100 px-6 py-4 last:border-b-0 transition-colors hover:bg-gray-50/80"
           >
-            <div className="w-28 text-[13px] text-muted-foreground">{entry.date}</div>
-            <div className="flex-1 text-[13px] font-medium text-foreground">{entry.summary}</div>
-            <div className="w-[300px] text-[13px] text-muted-foreground">{entry.retained}</div>
+            <div className="w-28 text-[13px] text-gray-600">{entry.date}</div>
+            <div className="flex-1 text-[13px] font-medium text-gray-900">{entry.summary}</div>
+            <div className="w-[300px] text-[13px] text-gray-600">{entry.retained}</div>
             <div className="w-24">
               <MemoryTypeBadge type={entry.type} />
             </div>
@@ -257,8 +257,8 @@ function StatChip({ label, highlight = false }: { label: string; highlight?: boo
   return (
     <span
       className={cn(
-        "rounded-md px-3 py-1 text-[12px]",
-        highlight ? "bg-accent/10 font-medium text-accent" : "bg-muted text-muted-foreground"
+        "rounded-md px-4 py-1.5 text-[12px] font-semibold",
+        highlight ? "bg-teal-50 text-teal-700 border border-teal-100" : "bg-gray-100 text-gray-700 border border-gray-200"
       )}
     >
       {label}
@@ -268,14 +268,14 @@ function StatChip({ label, highlight = false }: { label: string; highlight?: boo
 
 function MemoryTypeBadge({ type }: { type: "pattern" | "resolution" | "anomaly" | "context" }) {
   const styles = {
-    pattern: "bg-[#0D9488]/10 text-[#0D9488]",
-    resolution: "bg-[#00A651]/10 text-[#00A651]",
-    anomaly: "bg-[#F59E0B]/10 text-[#F59E0B]",
-    context: "bg-accent/10 text-accent",
+    pattern: "bg-teal-50 text-teal-700 border border-teal-100",
+    resolution: "bg-green-50 text-green-700 border border-green-100",
+    anomaly: "bg-amber-50 text-amber-700 border border-amber-100",
+    context: "bg-blue-50 text-blue-700 border border-blue-100",
   }
 
   return (
-    <span className={cn("rounded px-2 py-0.5 text-[12px] font-medium capitalize", styles[type])}>
+    <span className={cn("rounded px-2.5 py-1 text-[12px] font-semibold capitalize", styles[type])}>
       {type}
     </span>
   )

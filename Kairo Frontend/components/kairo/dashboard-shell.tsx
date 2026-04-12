@@ -176,7 +176,7 @@ export function DashboardShell() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-background">
+    <div className="flex h-screen w-full bg-white font-sans antialiased">
       {/* Left Navigation */}
       <LeftNav
         activePage={activePage}
@@ -189,12 +189,12 @@ export function DashboardShell() {
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="flex h-14 items-center justify-between border-b border-border px-10">
-          <h1 className="text-[28px] font-bold text-foreground">{getPageTitle()}</h1>
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-8">
+          <h1 className="text-xl font-semibold tracking-tight text-gray-900">{getPageTitle()}</h1>
           <button
             onClick={handleSimulateIncident}
             disabled={isSimulating}
-            className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex items-center gap-2 rounded-full bg-gray-900 px-6 py-2.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
           >
             <Plus className="h-4 w-4" />
             {isSimulating ? "Simulating..." : "Simulate Incident"}
@@ -202,7 +202,7 @@ export function DashboardShell() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-hidden bg-background">
+        <main className="flex-1 overflow-hidden bg-white">
           {renderPage()}
         </main>
       </div>

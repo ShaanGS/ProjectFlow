@@ -13,7 +13,7 @@ interface RightPanelProps {
 
 export function RightPanel({ activeIncident, injectedMessage }: RightPanelProps) {
   return (
-    <div className="hidden xl:flex h-full w-[340px] min-w-[340px] flex-col border-l border-border bg-background">
+    <div className="hidden h-full w-[340px] min-w-[340px] flex-col border-l border-gray-100 bg-white xl:flex">
       <AgentChat activeIncident={activeIncident} injectedMessage={injectedMessage} />
     </div>
   )

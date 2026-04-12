@@ -121,13 +121,14 @@ export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
       role: "user",
       content: userInput,
     }
-    
-    setMessages((prev) => [...prev, userMessage])
+
+    const nextMessages: Message[] = [...messages, userMessage]
+    setMessages(nextMessages)
     setInput("")
     setIsSending(true)
 
     try {
-      const historyPayload = [...messages, userMessage].map(({ role, content }) => ({
+      const historyPayload = nextMessages.map(({ role, content }) => ({
         role,
         content,
       }))
@@ -173,26 +174,26 @@ export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-white font-sans antialiased">
       {/* Header */}
-      <div className="border-b border-border/70 px-5 py-3.5">
+      <div className="border-b border-gray-100 bg-[#FAFAFA] px-6 py-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <KairoLogoMark className="h-9 w-9 shrink-0 rounded-full bg-[#0B0B0B] ring-black/10" />
+            <img src="/icon.svg" alt="Kairo Icon" className="h-8 w-8 shrink-0 object-contain" />
             <div className="min-w-0">
-              <h3 className="text-[16px] font-bold leading-tight tracking-[-0.02em] text-foreground">
+              <h3 className="text-[16px] font-bold leading-tight tracking-[-0.02em] text-gray-900">
                 Kairo Agent
               </h3>
-              <p className="text-[12px] text-muted-foreground">memory copilot</p>
+              <p className="text-[12px] text-gray-500">memory copilot</p>
             </div>
           </div>
           <div
-            className="h-2 w-2 shrink-0 rounded-full bg-[#0D9488] shadow-[0_0_0_4px_rgba(13,148,136,0.12)]"
+            className="h-2 w-2 shrink-0 rounded-full bg-teal-600 shadow-[0_0_0_4px_rgba(13,148,136,0.12)]"
             aria-hidden
           />
         </div>
         {messages.length > 0 && (
-          <div className="mt-3 flex justify-stretch sm:justify-end">
+          <div className="mt-4 flex justify-stretch sm:justify-end">
             <button
               type="button"
               onClick={handleExportPostMortem}
@@ -203,13 +204,12 @@ export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
                   : "Run an incident brief first (e.g. ask about boundary / resolution)"
               }
               className={cn(
-                "group inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary/70 px-3 py-2.5 sm:w-auto sm:min-w-[10.5rem]",
-                "text-[12px] font-semibold tracking-[-0.01em] text-foreground shadow-sm",
+                "group inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2.5 sm:w-auto sm:min-w-[10.5rem]",
+                "text-[12px] font-semibold tracking-[-0.01em] text-gray-900 shadow-sm",
                 "transition-all duration-200",
-                "hover:border-[#0D9488]/40 hover:bg-[#0D9488]/[0.08] hover:shadow-md",
+                "hover:border-teal-200 hover:bg-teal-50 hover:shadow-md",
                 "active:scale-[0.99]",
-                "disabled:pointer-events-none disabled:border-border/80 disabled:bg-muted/40 disabled:text-muted-foreground disabled:opacity-45 disabled:shadow-none",
-                "dark:bg-secondary/40 dark:hover:bg-[#0D9488]/15"
+                "disabled:pointer-events-none disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-400 disabled:opacity-45 disabled:shadow-none"
               )}
             >
               <span className="text-[13px] leading-none" aria-hidden>
@@ -217,7 +217,7 @@ export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
               </span>
               <span>Export Post-Mortem</span>
               <FileDown
-                className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-[#0D9488] group-disabled:group-hover:text-muted-foreground"
+                className="h-3.5 w-3.5 text-gray-400 transition-colors group-hover:text-teal-600 group-disabled:group-hover:text-gray-400"
                 strokeWidth={2}
                 aria-hidden
               />
@@ -231,36 +231,44 @@ export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-4">
             {/* Empty State Icon */}
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B0B0B] shadow-sm">
-              <KairoLogoMark className="h-14 w-14 rounded-2xl bg-[#0B0B0B] ring-white/10" />
+            <div className="mb-6">
+              <img src="/kairo-logo.png" alt="Kairo" className="w-36 h-auto object-contain" />
             </div>
-            
-            <h4 className="mb-2 text-lg font-semibold text-foreground">Kairo Agent</h4>
-            <p className="mb-6 max-w-[220px] text-center text-[13px] text-muted-foreground">
+
+            <p className="mb-8 max-w-[220px] text-center text-[13px] text-gray-500">
               Query incident history, vendor patterns, and memory logs.
             </p>
 
-            <p className="mb-3 text-[12px] text-muted-foreground">Today&apos;s suggested prompt</p>
+            {/* Metrics Row */}
+            <div className="mb-8 flex items-center justify-center gap-1.5 text-[11px] text-[#6b7280]">
+              <span>14 incidents</span>
+              <span>&middot;</span>
+              <span>89% recall</span>
+              <span>&middot;</span>
+              <span>3 patterns</span>
+            </div>
+
+            <p className="mb-4 text-[12px] text-gray-500">Today&apos;s suggested prompts</p>
 
             {/* Suggestion Cards */}
-            <div className="flex flex-col gap-2 w-full px-2">
+            <div className="flex flex-col gap-3 w-full px-3">
               {suggestionCards.map((card, index) => {
                 const Icon = card.icon
                 return (
                   <button
                     key={index}
                     onClick={() => handleSuggestionClick(card.text)}
-                    className="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:bg-muted"
+                    className="flex items-start gap-3 rounded-lg border border-gray-100 bg-white p-4 text-left transition-all hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm"
                   >
-                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                    <span className="text-[13px] text-foreground leading-snug">{card.text}</span>
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" strokeWidth={1.5} />
+                    <span className="text-[13px] text-gray-900 leading-snug">{card.text}</span>
                   </button>
                 )
               })}
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-3 px-5 py-4">
+          <div className="flex flex-col gap-4 px-6 py-5">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -270,14 +278,21 @@ export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
                 )}
               >
                 {message.role === "assistant" && (
-                  <span className="mb-1 text-[11px] font-medium text-[#0D9488]">Kairo</span>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-semibold text-teal-600">Kairo</span>
+                    {message.content.includes("MEMORY_REF") && (
+                      <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+                        ⚡ Memory Active
+                      </span>
+                    )}
+                  </div>
                 )}
                 <div
                   className={cn(
                     "whitespace-pre-wrap px-4 py-3 text-[13px] leading-6 shadow-sm",
                     message.role === "user"
-                      ? "max-w-[82%] rounded-[18px_18px_4px_18px] bg-[#F0F0F0] text-foreground"
-                      : "w-full rounded-[14px] border border-border bg-white text-foreground"
+                      ? "max-w-[82%] rounded-[18px_18px_4px_18px] border border-gray-800 bg-gray-900 text-white"
+                      : "w-full rounded-lg border border-gray-100 bg-white text-gray-900"
                   )}
                 >
                   {message.content}
@@ -290,29 +305,29 @@ export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border p-4">
+      <div className="border-t border-gray-100 bg-white p-4">
         {/* Model Selector */}
-        <div className="mb-3 flex items-center">
-          <button className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground">
+        <div className="mb-4 flex items-center">
+          <button className="flex items-center gap-1.5 text-[12px] text-gray-500 hover:text-gray-900">
             <Zap className="h-3.5 w-3.5" />
             <span>Groq · qwen3</span>
             <ChevronDown className="h-3 w-3" />
           </button>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 border border-[#e5e7eb] rounded-lg bg-gray-100 px-4 py-3 transition-all focus-within:border-gray-300 focus-within:bg-white">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="What's your agent going to help you with today?"
-            className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+            placeholder="Describe the incident or ask Kairo..."
+            className="flex-1 bg-transparent text-[14px] text-gray-900 placeholder:text-gray-400 focus:outline-none"
           />
           <button
             onClick={handleSend}
             disabled={isSending}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-white transition-all duration-200 hover:bg-gray-800 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
           >
             <ArrowUp className="h-4 w-4" strokeWidth={2} />
           </button>

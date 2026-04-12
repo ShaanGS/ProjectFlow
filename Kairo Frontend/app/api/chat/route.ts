@@ -55,19 +55,6 @@ function formatWhatToDoNowBlock(matches: MemoryMatch[]): string {
   return "**What to do now:**\n" + lines.map((l) => `- ${l}`).join("\n")
 }
 
-/** If they asked for next steps, ensure a concrete block exists (append from memory if the model omitted it). */
-function ensureWhatToDoNowInReply(
-  reply: string,
-  latestUser: string,
-  anchorMatches: MemoryMatch[]
-): string {
-  if (!wantsNowGuidance(latestUser) || !anchorMatches.length) return reply.trim()
-  const trimmed = reply.trim()
-  if (!trimmed) return formatWhatToDoNowBlock(anchorMatches)
-  if (/\*\*what to do now\*\*:|what to do now:/i.test(trimmed)) return trimmed
-  return `${trimmed}\n\n${formatWhatToDoNowBlock(anchorMatches)}`
-}
-
 function recalledMemoryJson(matches: MemoryMatch[]) {
   const rows = matches.map((m) => {
     const meta = m.metadata ?? {}
@@ -106,38 +93,18 @@ function buildRecallQuery(
   return parts.filter(Boolean).join(" ").trim() || "incident triage"
 }
 
-function followUpSystemWithAnchor(
-  anchorFix: string | undefined,
-  wantsGuidance: boolean
-) {
-  const base = `You are Kairo, a DevOps Copilot. Answer the user's follow-up question conversationally and concisely based ONLY on the context of the incident detailed in the chat history above. Do not repeat the full incident brief. Just answer the question.
+const KAIRO_SYSTEM_PROMPT = (memoryJson: string) => `You are Kairo, a memory-native incident copilot for SRE teams.
+You have access to a vector database of past post-mortems and
+vendor incident history.
 
-If the user is asking what to do now, what's next, next steps, remediation, or how to fix, you MUST include a short **What to do now:** section (2–4 bullets) tied to the incident already described in the thread.`
+For the FIRST message describing a new incident, use the full structured format with BOUNDARY, ROOT_CAUSE, RESOLUTION_STEPS, SKIP, and MEMORY_REF sections.
+For ALL follow-up messages in the same conversation, IGNORE the structured format completely. Just answer the specific question asked in 2-3 short sentences. Be direct, conversational, and human. Never repeat what you already said in the same chat.
 
-  if (!wantsGuidance || !anchorFix?.trim()) return base
-
-  return `${base}
-
-ANCHOR_RUNBOOK (ground truth from memory bank for this incident thread—use if the thread is thin):
-${anchorFix.trim()}`
-}
-
-const STRICT_INCIDENT_SYSTEM = (memoryJson: string) => `You are Kairo, an elite L3 Incident Copilot.
+MEMORY RULE: You must never hallucinate resolution steps. Only
+suggest actions that are grounded in the incident context provided.
 
 [RECALLED_MEMORY]
-${memoryJson}
-
-You MUST output exactly this Markdown-style structure. Use only facts from [RECALLED_MEMORY]. If [RECALLED_MEMORY] is empty [], output exactly: INSUFFICIENT_MEMORY: No historical precedent found. Escalate to L2.
-
-BOUNDARY: [vendor_side | internal | mixed from memory classification]
-ROOT_CAUSE_MEMORY: [from memory actual_root_cause]
-RESOLUTION_STEPS:
-1. [from memory successful_fix; split on semicolons if multiple actions]
-SKIP: [from memory failed_checks]
-
-If the user is only asking what to do next (same as RESOLUTION_STEPS), still output the full structure above—do not skip sections.
-
-No other sections. No \`<redacted_thinking>\` tags. No pleasantries.`
+${memoryJson}`
 
 export async function POST(req: NextRequest) {
   try {
@@ -177,10 +144,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const memoryJson = recalledMemoryJson(recalledMatches)
-    const demoBrief = buildKairoBrief(latestUser, recalledMatches)
+    const matchesForPrompt = isFirstIncidentTurn
+      ? recalledMatches
+      : anchorMatches.length > 0
+        ? anchorMatches
+        : recalledMatches
 
-    const anchorFix = anchorMatches[0]?.metadata?.successful_fix
+    const memoryJson = recalledMemoryJson(matchesForPrompt)
+    const demoBrief = buildKairoBrief(latestUser, recalledMatches)
 
     if (process.env.KAIRO_DEMO_MODE !== "llm") {
       if (!isFirstIncidentTurn) {
@@ -228,9 +199,15 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const systemPrompt = isFirstIncidentTurn
-      ? STRICT_INCIDENT_SYSTEM(memoryJson)
-      : followUpSystemWithAnchor(anchorFix, guidanceIntent)
+    if (isFirstIncidentTurn) {
+      return NextResponse.json({
+        response: demoBrief,
+        memoryMatches: recalledMatches.length,
+        recalledIncidents: recalledMatches,
+      })
+    }
+
+    const systemPrompt = KAIRO_SYSTEM_PROMPT(memoryJson)
 
     const response = await groq.chat.completions.create({
       model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
@@ -238,8 +215,8 @@ export async function POST(req: NextRequest) {
         { role: "system", content: systemPrompt },
         ...chatMessages.map((m) => ({ role: m.role, content: m.content })),
       ],
-      max_tokens: isFirstIncidentTurn ? 700 : 550,
-      temperature: isFirstIncidentTurn ? 0.2 : 0.35,
+      max_tokens: 600,
+      temperature: 0.75,
     })
 
     const rawContent = response.choices[0]?.message?.content
@@ -248,31 +225,19 @@ export async function POST(req: NextRequest) {
       !cleaned || cleaned === "No response generated."
 
     let responseText: string
-    if (missingModel && isFirstIncidentTurn) {
-      responseText = demoBrief
-    } else if (missingModel) {
+    if (missingModel) {
       responseText =
         guidanceIntent && anchorMatches.length
           ? formatWhatToDoNowBlock(anchorMatches)
           : "No response from model. Try again."
-    } else if (isFirstIncidentTurn) {
-      responseText = cleaned
     } else {
-      responseText = ensureWhatToDoNowInReply(
-        cleaned,
-        latestUser,
-        anchorMatches
-      )
+      responseText = cleaned
     }
 
     return NextResponse.json({
       response: responseText,
-      memoryMatches: isFirstIncidentTurn
-        ? recalledMatches.length
-        : anchorMatches.length,
-      recalledIncidents: isFirstIncidentTurn
-        ? recalledMatches
-        : anchorMatches,
+      memoryMatches: anchorMatches.length,
+      recalledIncidents: anchorMatches,
     })
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Chat request failed"

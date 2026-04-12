@@ -115,7 +115,7 @@ export function MemoryLogPage() {
   })
 
   return (
-    <div className="flex-1 overflow-y-auto px-10 pt-8">
+    <div className="flex-1 overflow-y-auto bg-white px-8 pb-8 pt-8">
       {/* Filter Bar */}
       <div className="mb-6 flex items-center gap-4">
         <FilterDropdown
@@ -129,20 +129,20 @@ export function MemoryLogPage() {
           onChange={setSelectedType}
         />
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search memory entries..."
-            className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-[13px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300"
           />
         </div>
       </div>
 
       {/* Memory Table */}
-      <div className="rounded-lg border border-border">
-        <div className="flex items-center border-b border-border px-4 py-2 text-[13px] text-muted-foreground">
+      <div className="overflow-hidden rounded-lg border border-gray-100 bg-white shadow-sm">
+        <div className="flex items-center border-b border-gray-100 px-6 py-4 text-[12px] font-semibold uppercase tracking-wide text-gray-500">
           <div className="w-36">Timestamp</div>
           <div className="w-24">Vendor</div>
           <div className="flex-1">Incident</div>
@@ -154,23 +154,23 @@ export function MemoryLogPage() {
         {filteredEntries.map((entry) => (
           <div
             key={entry.id}
-            className="flex items-center border-b border-border px-4 py-3 last:border-b-0 hover:bg-muted/50"
+            className="flex items-center border-b border-gray-100 px-6 py-4 last:border-b-0 transition-colors hover:bg-gray-50/80"
           >
-            <div className="w-36 text-[13px] text-muted-foreground">{entry.timestamp}</div>
+            <div className="w-36 text-[13px] text-gray-500">{entry.timestamp}</div>
             <div className="w-24">
-              <span className="rounded-md bg-muted px-2 py-0.5 text-[12px] text-muted-foreground">
+              <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-0.5 text-[12px] text-gray-700">
                 {entry.vendor}
               </span>
             </div>
-            <div className="flex-1 text-[13px] font-medium text-foreground">{entry.incident}</div>
+            <div className="flex-1 text-[13px] font-medium text-gray-900">{entry.incident}</div>
             <div className="w-24">
               <MemoryTypeBadge type={entry.type} />
             </div>
-            <div className="w-[280px] text-[13px] text-muted-foreground truncate" title={entry.retained}>
+            <div className="w-[280px] truncate text-[13px] text-gray-500" title={entry.retained}>
               {entry.retained}
             </div>
             <div className="w-8">
-              <button className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+              <button className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-900">
                 <MoreHorizontal className="h-4 w-4" />
               </button>
             </div>
@@ -178,7 +178,7 @@ export function MemoryLogPage() {
         ))}
 
         {filteredEntries.length === 0 && (
-          <div className="flex items-center justify-center py-12 text-[13px] text-muted-foreground">
+          <div className="flex items-center justify-center py-12 text-[13px] text-gray-500">
             No memory entries found matching your filters.
           </div>
         )}
@@ -201,7 +201,7 @@ function FilterDropdown({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+        className="appearance-none rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-8 text-[13px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-300"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -209,7 +209,7 @@ function FilterDropdown({
           </option>
         ))}
       </select>
-      <ChevronDown className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
     </div>
   )
 }
