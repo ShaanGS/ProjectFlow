@@ -7,11 +7,12 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 next.user-config.*
 
-# Environment variables
+# Environment variables (tracked template is an exception)
 .env*
-
+!.env.example
 
 # Common ignores
 node_modules
 .next/
 .DS_Store
+*.tsbuildinfo

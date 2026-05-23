@@ -1,16 +1,14 @@
 {
-  "name": "my-project",
+  "name": "kairo-ai",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "slack": "node slack-bot.js"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@slack/bolt": "^3.20.0",
     "dotenv": "^16.4.5",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.12",
