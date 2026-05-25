@@ -37,7 +37,6 @@ function getFirstUserTurn(chatMessages: ChatTurn[]) {
   return chatMessages.find((m) => m.role === "user")
 }
 
-/** User is asking for immediate actions / remediation (not general chit-chat). */
 function wantsNowGuidance(text: string) {
   const q = text.toLowerCase()
   return /what (should|can) we do(\s+now)?|what to do(\s+now)?|what'?s next|next steps?|next move|immediate action|how do (we|i) (fix|mitigate|resolve|proceed)|how to (fix|rectify|resolve|proceed)|remediation|mitigation|runbook|action items?|what now/i.test(
@@ -111,6 +110,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { currentIncident } = body
 
+    // Accept pre-retrieved memory matches from the caller (avoids redundant recall)
+    const injectedEpisodes: MemoryMatch[] | null =
+      Array.isArray(body.past_episodes) && body.past_episodes.length > 0
+        ? (body.past_episodes as MemoryMatch[])
+        : Array.isArray(body.pastEpisodes) && body.pastEpisodes.length > 0
+          ? (body.pastEpisodes as MemoryMatch[])
+          : null
+
     const chatMessages = normalizeChatMessages(body)
     if (!chatMessages.length) {
       return NextResponse.json(
@@ -129,7 +136,11 @@ export async function POST(req: NextRequest) {
     let recalledMatches: MemoryMatch[] = []
     let anchorMatches: MemoryMatch[] = []
 
-    if (isFirstIncidentTurn) {
+    if (injectedEpisodes) {
+      // Use caller-supplied matches — they are already the result of retrieval
+      recalledMatches = injectedEpisodes
+      anchorMatches = injectedEpisodes
+    } else if (isFirstIncidentTurn) {
       const recalled = await recallIncidents(
         buildRecallQuery(currentIncident, chatMessages)
       )

@@ -135,7 +135,12 @@ function expandQueryTerms(terms: string[]): string[] {
     ["webhook", "webhooks", "callback", "callbacks", "capture"],
     ["failing", "failure", "failures", "failed", "outage", "degraded"],
     ["timeout", "timeouts", "504", "latency", "slow", "delay", "delayed"],
-    ["otp", "sms", "dlt"],
+    ["otp", "sms", "dlt", "delivery", "message"],
+    ["auth", "auth0", "jwt", "token", "login", "authentication"],
+    ["db", "database", "postgres", "pool", "connection", "checkout"],
+    ["upload", "kyc", "s3", "bucket", "put", "get"],
+    ["upi", "payment", "card", "razorpay", "cashfree"],
+    ["north", "india", "delhi", "ncr", "mumbai", "bengaluru"],
   ]
   for (const term of terms) {
     out.add(term)
@@ -160,44 +165,64 @@ export async function recallIncidents(query: string) {
 
   if (!hasHindsightConfig()) {
     const anchor = detectVendorAnchor(query)
-    const rawTerms = query.toLowerCase().split(/\W+/).filter(Boolean)
+    const rawTerms = query.toLowerCase().split(/\W+/).filter((t) => t.length > 2)
     const queryTerms = expandQueryTerms(rawTerms)
 
-    const matches = incidents
-      .filter((incident) => incidentPassesAnchor(incident, anchor))
-      .map((incident) => {
-        const searchable = [
-          incident.title,
-          incident.vendor ?? "internal",
-          incident.region,
-          incident.symptoms.join(" "),
-          incident.embedding_text,
-        ].join(" ").toLowerCase()
-        const score = queryTerms.reduce((total, term) => total + (searchable.includes(term) ? 1 : 0), 0)
+    // Score each incident against all searchable fields (not just embedding_text)
+    const anchoredIncidents = incidents.filter((incident) => incidentPassesAnchor(incident, anchor))
 
-        return { incident, score }
-      })
-      .filter(({ score }) => score > 0)
+    const scored = anchoredIncidents.map((incident) => {
+      const searchable = [
+        incident.title,
+        incident.vendor ?? "internal",
+        incident.region,
+        incident.symptoms.join(" "),
+        incident.actual_root_cause ?? "",
+        incident.customer_impact,
+        incident.embedding_text,
+      ].join(" ").toLowerCase()
+
+      const score = queryTerms.reduce(
+        (total, term) => total + (searchable.includes(term) ? 1 : 0),
+        0
+      )
+      return { incident, score }
+    })
+
+    // Primary: incidents with at least 1 term match
+    let topMatches = scored
+      .filter(({ score }) => score >= 1)
       .sort((a, b) => b.score - a.score)
       .slice(0, 4)
-      .map(({ incident }) => ({
-        id: incident.incident_id,
-        text: incident.embedding_text,
-        type: "experience",
-        metadata: {
-          incident_id: incident.incident_id,
-          title: incident.title,
-          vendor: incident.vendor ?? "internal",
-          region: incident.region,
-          classification: incident.classification,
-          actual_root_cause: incident.actual_root_cause ?? "",
-          successful_fix: incident.successful_fix,
-          failed_checks: incident.failed_checks.join(", "),
-          time_to_resolution_minutes: String(incident.time_to_resolution_minutes),
-          timestamp_start: incident.timestamp_start,
-          customer_impact: incident.customer_impact,
-        },
-      })) as MemoryMatch[]
+
+    // Fallback: if no term matches, return top-3 anchor-passing incidents anyway
+    if (topMatches.length === 0 && anchoredIncidents.length > 0) {
+      topMatches = anchoredIncidents.slice(0, 3).map((incident) => ({ incident, score: 0 }))
+    }
+
+    // Absolute fallback: if still nothing, return top-3 globally
+    if (topMatches.length === 0) {
+      topMatches = incidents.slice(0, 3).map((incident) => ({ incident, score: 0 }))
+    }
+
+    const matches = topMatches.map(({ incident }) => ({
+      id: incident.incident_id,
+      text: incident.embedding_text,
+      type: "experience",
+      metadata: {
+        incident_id: incident.incident_id,
+        title: incident.title,
+        vendor: incident.vendor ?? "internal",
+        region: incident.region,
+        classification: incident.classification,
+        actual_root_cause: incident.actual_root_cause ?? "",
+        successful_fix: incident.successful_fix,
+        failed_checks: incident.failed_checks.join(", "),
+        time_to_resolution_minutes: String(incident.time_to_resolution_minutes),
+        timestamp_start: incident.timestamp_start,
+        customer_impact: incident.customer_impact,
+      },
+    })) as MemoryMatch[]
 
     return {
       results: matches,

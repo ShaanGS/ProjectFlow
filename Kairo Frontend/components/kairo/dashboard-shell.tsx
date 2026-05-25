@@ -9,29 +9,7 @@ import { VendorsOverviewPage } from "./pages/vendors-overview"
 import { MemoryLogPage } from "./pages/memory-log"
 import { PatternRulesPage } from "./pages/pattern-rules"
 import { Plus } from "lucide-react"
-
-interface ApiIncident {
-  incident_id: string
-  title: string
-  vendor: string | null
-  severity: string
-  symptoms?: string[]
-  timestamp_start?: string
-  time_to_resolution_minutes?: number
-  classification?: string
-}
-
-interface DisplayIncident {
-  id: string
-  name: string
-  vendor: string
-  status: "live" | "resolved"
-  severity: "critical" | "warning" | "info"
-  time: string
-  memoryMatches: number
-  classification?: string
-  raw?: ApiIncident
-}
+import type { ApiIncident, DisplayIncident, LoadStatus, MemoryMatch } from "@/types/kairo"
 
 interface AgentMessage {
   id: string
@@ -68,6 +46,9 @@ export function DashboardShell() {
   const [simulationCounter, setSimulationCounter] = useState(0)
   const [isSimulating, setIsSimulating] = useState(false)
   const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null)
+  const [memoryMatches, setMemoryMatches] = useState<MemoryMatch[]>([])
+  const [memoryStatus, setMemoryStatus] = useState<LoadStatus>("idle")
+  const [reasoningStatus, setReasoningStatus] = useState<LoadStatus>("idle")
 
   useEffect(() => {
     fetch("/api/incidents")
@@ -107,10 +88,32 @@ export function DashboardShell() {
     if (activeVendor) {
       return <VendorProfilePage vendorId={activeVendor} />
     }
+
+    const vendorPatternCount = new Set(
+      [...activeIncidents, ...resolvedIncidents]
+        .map((incident) => incident.vendor)
+        .filter(Boolean)
+    ).size
+
+    const recalledMinutes = memoryMatches.reduce((total, match) => {
+      const value = Number(match.metadata?.time_to_resolution_minutes ?? 0)
+      return Number.isFinite(value) ? total + value : total
+    }, 0)
     
     switch (activePage) {
       case "incidents":
-        return <LiveIncidentsPage activeIncidents={activeIncidents} resolvedIncidents={resolvedIncidents} />
+        return (
+          <LiveIncidentsPage
+            activeIncidents={activeIncidents}
+            resolvedIncidents={resolvedIncidents}
+            activeIncident={activeIncident}
+            memoryMatches={memoryMatches}
+            memoryStatus={memoryStatus}
+            reasoningStatus={reasoningStatus}
+            vendorPatternCount={vendorPatternCount}
+            timeSavedMinutes={recalledMinutes}
+          />
+        )
       case "vendors":
         return <VendorsOverviewPage onVendorSelect={handleVendorSelect} />
       case "memory":
@@ -118,7 +121,18 @@ export function DashboardShell() {
       case "patterns":
         return <PatternRulesPage />
       default:
-        return <LiveIncidentsPage activeIncidents={activeIncidents} resolvedIncidents={resolvedIncidents} />
+        return (
+          <LiveIncidentsPage
+            activeIncidents={activeIncidents}
+            resolvedIncidents={resolvedIncidents}
+            activeIncident={activeIncident}
+            memoryMatches={memoryMatches}
+            memoryStatus={memoryStatus}
+            reasoningStatus={reasoningStatus}
+            vendorPatternCount={vendorPatternCount}
+            timeSavedMinutes={recalledMinutes}
+          />
+        )
     }
   }
 
@@ -126,6 +140,11 @@ export function DashboardShell() {
     if (isSimulating) return
 
     setIsSimulating(true)
+    setActivePage("incidents")
+    setActiveVendor(null)
+    setMemoryStatus("loading")
+    setReasoningStatus("loading")
+    setMemoryMatches([])
 
     try {
       const response = await fetch("/api/alert", {
@@ -141,8 +160,22 @@ export function DashboardShell() {
       }
 
       const incident = data.incident as ApiIncident
+      const incidentDescription = [
+        incident.vendor ?? "internal",
+        incident.region,
+        incident.title,
+        ...(incident.symptoms ?? []),
+        incident.customer_impact,
+      ]
+        .filter(Boolean)
+        .join(" ")
 
       setActiveIncident(incident)
+
+      // Use the matches already recalled by /api/alert — no second round-trip needed
+      const matches = (data.recalledIncidents ?? []) as MemoryMatch[]
+      const matchCount = matches.length
+
       setActiveIncidents((previous) => [
         {
           id: incident.incident_id,
@@ -151,20 +184,62 @@ export function DashboardShell() {
           status: "live",
           severity: mapSeverity(incident.severity),
           time: "just now",
-          memoryMatches: data.memoryMatches ?? 0,
+          memoryMatches: matchCount,
           classification: data.classification,
           raw: incident,
         },
         ...previous,
       ])
+
+      // Populate Episodic Memory panel immediately from alert recall
+      setMemoryMatches(matches)
+      setMemoryStatus(matches.length > 0 ? "loaded" : "loaded")
+
+      // Pass the same retrieved matches into chat so reasoning is grounded in them
+      const chatResponse = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentIncident: incident,
+          past_episodes: matches,
+          messages: [
+            {
+              role: "user",
+              content: `Analyze this active incident using memory: ${incidentDescription}`,
+            },
+          ],
+        }),
+      })
+      const chatData = await chatResponse.json()
+
+      if (!chatResponse.ok) {
+        throw new Error(chatData.error ?? "Failed to load Kairo reasoning")
+      }
+
+      // If chat returned fresher matches (it re-recalled), keep the larger set
+      const chatMatches = (chatData.recalledIncidents ?? []) as MemoryMatch[]
+      if (chatMatches.length > matches.length) {
+        setMemoryMatches(chatMatches)
+        setActiveIncidents((previous) =>
+          previous.map((item) =>
+            item.id === incident.incident_id
+              ? { ...item, memoryMatches: chatMatches.length }
+              : item
+          )
+        )
+      }
+
+      setReasoningStatus("loaded")
       setAgentMessage({
         id: `sim_${Date.now()}`,
         role: "assistant",
-        content: data.analysis,
+        content: chatData.response ?? data.analysis,
       })
       setSimulationCounter((previous) => previous + 1)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to simulate incident"
+      setMemoryStatus((previous) => (previous === "loaded" ? previous : "error"))
+      setReasoningStatus("error")
       setAgentMessage({
         id: `sim_error_${Date.now()}`,
         role: "assistant",
@@ -208,7 +283,13 @@ export function DashboardShell() {
       </div>
 
       {/* Right Panel - Agent Chat */}
-      <RightPanel activeIncident={activeIncident} injectedMessage={agentMessage} />
+      <RightPanel
+        activeIncident={activeIncident}
+        injectedMessage={agentMessage}
+        memoryMatches={memoryMatches}
+        memoryStatus={memoryStatus}
+        reasoningStatus={reasoningStatus}
+      />
     </div>
   )
 }

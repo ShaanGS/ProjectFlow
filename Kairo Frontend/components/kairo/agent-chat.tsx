@@ -11,7 +11,7 @@ import {
   FileDown,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { KairoLogoMark } from "./vendor-logo"
+import type { ApiIncident, MemoryMatch } from "@/types/kairo"
 
 /** First assistant message that looks like the structured incident brief (LLM, demo, or channel update). */
 function findIncidentBriefText(messages: Message[]): string | null {
@@ -69,11 +69,12 @@ const suggestionCards = [
 ]
 
 interface AgentChatProps {
-  activeIncident: unknown
+  activeIncident: ApiIncident | null
   injectedMessage: Message | null
+  memoryMatches?: MemoryMatch[]
 }
 
-export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
+export function AgentChat({ activeIncident, injectedMessage, memoryMatches = [] }: AgentChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
@@ -140,6 +141,8 @@ export function AgentChat({ activeIncident, injectedMessage }: AgentChatProps) {
           messages: historyPayload,
           message: userInput,
           currentIncident: activeIncident,
+          // Forward the retrieved memory matches so follow-up chats stay grounded
+          past_episodes: memoryMatches.length > 0 ? memoryMatches : undefined,
         }),
       })
       const data = await response.json()

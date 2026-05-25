@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { retainIncident } from "@/lib/hindsight"
 import incidents from "@/data/incidents.json"
+import { retainIncident } from "@/lib/hindsight"
 
 export async function POST() {
   try {
@@ -18,4 +18,3 @@ export async function POST() {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
-
