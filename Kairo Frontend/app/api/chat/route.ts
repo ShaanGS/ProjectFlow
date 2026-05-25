@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { recallIncidents, type MemoryMatch } from "@/lib/hindsight"
-import groq, { hasGroqConfig } from "@/lib/groq"
-import { cleanModelOutput } from "@/lib/llm-output"
-import { buildKairoBrief } from "@/lib/kairo-brief"
+import { runKairoAgent } from "@/lib/agent/runtime"
+import type { ActiveIncidentContext, RetrievedMemoryIncident } from "@/types/agent"
 
 type ChatTurn = { role: "user" | "assistant"; content: string }
 
@@ -29,96 +27,47 @@ function normalizeChatMessages(body: {
   return []
 }
 
-function countUserMessages(chatMessages: ChatTurn[]) {
-  return chatMessages.filter((m) => m.role === "user").length
+function activeIncidentFromBody(body: Record<string, unknown>, latestUserMessage: string) {
+  const current =
+    body.currentIncident && typeof body.currentIncident === "object"
+      ? (body.currentIncident as ActiveIncidentContext)
+      : null
+
+  if (current) return current
+
+  return {
+    title: latestUserMessage || "Untitled incident",
+    description: latestUserMessage,
+    signals: latestUserMessage ? [latestUserMessage] : [],
+  } satisfies ActiveIncidentContext
 }
 
-function getFirstUserTurn(chatMessages: ChatTurn[]) {
-  return chatMessages.find((m) => m.role === "user")
-}
+function normalizeMemoryMatches(body: Record<string, unknown>) {
+  const raw =
+    Array.isArray(body.past_episodes) && body.past_episodes.length > 0
+      ? body.past_episodes
+      : Array.isArray(body.pastEpisodes) && body.pastEpisodes.length > 0
+        ? body.pastEpisodes
+        : Array.isArray(body.memoryMatches) && body.memoryMatches.length > 0
+          ? body.memoryMatches
+          : []
 
-function wantsNowGuidance(text: string) {
-  const q = text.toLowerCase()
-  return /what (should|can) we do(\s+now)?|what to do(\s+now)?|what'?s next|next steps?|next move|immediate action|how do (we|i) (fix|mitigate|resolve|proceed)|how to (fix|rectify|resolve|proceed)|remediation|mitigation|runbook|action items?|what now/i.test(
-    q
-  )
-}
-
-function formatWhatToDoNowBlock(matches: MemoryMatch[]): string {
-  const fix = matches[0]?.metadata?.successful_fix?.trim()
-  if (!fix) {
-    return "**What to do now:** No runbook hit for this thread—re-state the vendor/symptoms in one message or simulate the alert again so memory can anchor."
-  }
-  const parts = fix.split(/\s*;\s*/).map((s) => s.trim()).filter(Boolean)
-  const lines = parts.length ? parts : [fix]
-  return "**What to do now:**\n" + lines.map((l) => `- ${l}`).join("\n")
-}
-
-function recalledMemoryJson(matches: MemoryMatch[]) {
-  const rows = matches.map((m) => {
-    const meta = m.metadata ?? {}
-    return {
-      incident_id: meta.incident_id ?? null,
-      title: meta.title ?? null,
-      timestamp_start: meta.timestamp_start ?? null,
-      vendor: meta.vendor ?? null,
-      region: meta.region ?? null,
-      classification: meta.classification ?? null,
-      actual_root_cause: meta.actual_root_cause ?? null,
-      successful_fix: meta.successful_fix ?? null,
-      failed_checks: meta.failed_checks ?? null,
-      customer_impact: meta.customer_impact ?? null,
-      time_to_resolution_minutes: meta.time_to_resolution_minutes ?? null,
-    }
+  return raw.filter((item): item is RetrievedMemoryIncident => {
+    return Boolean(
+      item &&
+        typeof item === "object" &&
+        "matched_incident_id" in item &&
+        "title" in item &&
+        "similarity" in item
+    )
   })
-  return JSON.stringify(rows, null, 2)
 }
-
-function buildRecallQuery(
-  currentIncident: { vendor?: string; symptoms?: string[] } | null | undefined,
-  userTurns: ChatTurn[]
-) {
-  const parts: string[] = []
-  if (currentIncident) {
-    const v = currentIncident.vendor ?? ""
-    const s = Array.isArray(currentIncident.symptoms)
-      ? currentIncident.symptoms.join(" ")
-      : ""
-    parts.push(`${v} ${s}`.trim())
-  }
-  for (const m of userTurns) {
-    if (m.role === "user") parts.push(m.content)
-  }
-  return parts.filter(Boolean).join(" ").trim() || "incident triage"
-}
-
-const KAIRO_SYSTEM_PROMPT = (memoryJson: string) => `You are Kairo, a memory-native incident copilot for SRE teams.
-You have access to a vector database of past post-mortems and
-vendor incident history.
-
-For the FIRST message describing a new incident, use the full structured format with BOUNDARY, ROOT_CAUSE, RESOLUTION_STEPS, SKIP, and MEMORY_REF sections.
-For ALL follow-up messages in the same conversation, IGNORE the structured format completely. Just answer the specific question asked in 2-3 short sentences. Be direct, conversational, and human. Never repeat what you already said in the same chat.
-
-MEMORY RULE: You must never hallucinate resolution steps. Only
-suggest actions that are grounded in the incident context provided.
-
-[RECALLED_MEMORY]
-${memoryJson}`
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
-    const { currentIncident } = body
-
-    // Accept pre-retrieved memory matches from the caller (avoids redundant recall)
-    const injectedEpisodes: MemoryMatch[] | null =
-      Array.isArray(body.past_episodes) && body.past_episodes.length > 0
-        ? (body.past_episodes as MemoryMatch[])
-        : Array.isArray(body.pastEpisodes) && body.pastEpisodes.length > 0
-          ? (body.pastEpisodes as MemoryMatch[])
-          : null
-
+    const body = (await req.json()) as Record<string, unknown>
     const chatMessages = normalizeChatMessages(body)
+
     if (!chatMessages.length) {
       return NextResponse.json(
         { error: "Missing messages or message" },
@@ -126,130 +75,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const latestUser =
-      [...chatMessages].reverse().find((m) => m.role === "user")?.content ?? ""
+    const latestUserMessage =
+      [...chatMessages].reverse().find((message) => message.role === "user")?.content ?? ""
 
-    const userTurnCount = countUserMessages(chatMessages)
-    const isFirstIncidentTurn = userTurnCount === 1
-    const guidanceIntent = wantsNowGuidance(latestUser)
+    const activeIncident = activeIncidentFromBody(body, latestUserMessage)
+    const retrievedMemory = normalizeMemoryMatches(body)
 
-    let recalledMatches: MemoryMatch[] = []
-    let anchorMatches: MemoryMatch[] = []
-
-    if (injectedEpisodes) {
-      // Use caller-supplied matches — they are already the result of retrieval
-      recalledMatches = injectedEpisodes
-      anchorMatches = injectedEpisodes
-    } else if (isFirstIncidentTurn) {
-      const recalled = await recallIncidents(
-        buildRecallQuery(currentIncident, chatMessages)
-      )
-      recalledMatches = recalled.matches
-    } else {
-      const firstUser = getFirstUserTurn(chatMessages)
-      if (firstUser) {
-        const anchor = await recallIncidents(
-          buildRecallQuery(currentIncident, [firstUser])
-        )
-        anchorMatches = anchor.matches
-      }
-    }
-
-    const matchesForPrompt = isFirstIncidentTurn
-      ? recalledMatches
-      : anchorMatches.length > 0
-        ? anchorMatches
-        : recalledMatches
-
-    const memoryJson = recalledMemoryJson(matchesForPrompt)
-    const demoBrief = buildKairoBrief(latestUser, recalledMatches)
-
-    if (process.env.KAIRO_DEMO_MODE !== "llm") {
-      if (!isFirstIncidentTurn) {
-        if (guidanceIntent && anchorMatches.length) {
-          return NextResponse.json({
-            response: formatWhatToDoNowBlock(anchorMatches),
-            memoryMatches: anchorMatches.length,
-            recalledIncidents: anchorMatches,
-          })
-        }
-        return NextResponse.json({
-          response:
-            "Demo mode only formats the first incident turn from memory. Set KAIRO_DEMO_MODE=llm for conversational follow-ups.",
-          memoryMatches: anchorMatches.length,
-          recalledIncidents: anchorMatches,
-        })
-      }
-      return NextResponse.json({
-        response: demoBrief,
-        memoryMatches: recalledMatches.length,
-        recalledIncidents: recalledMatches,
-      })
-    }
-
-    if (!hasGroqConfig()) {
-      if (!isFirstIncidentTurn) {
-        if (guidanceIntent && anchorMatches.length) {
-          return NextResponse.json({
-            response: formatWhatToDoNowBlock(anchorMatches),
-            memoryMatches: anchorMatches.length,
-            recalledIncidents: anchorMatches,
-          })
-        }
-        return NextResponse.json({
-          response:
-            "Configure GROQ_API_KEY to enable conversational follow-ups in LLM mode.",
-          memoryMatches: anchorMatches.length,
-          recalledIncidents: anchorMatches,
-        })
-      }
-      return NextResponse.json({
-        response: demoBrief,
-        memoryMatches: recalledMatches.length,
-        recalledIncidents: recalledMatches,
-      })
-    }
-
-    if (isFirstIncidentTurn) {
-      return NextResponse.json({
-        response: demoBrief,
-        memoryMatches: recalledMatches.length,
-        recalledIncidents: recalledMatches,
-      })
-    }
-
-    const systemPrompt = KAIRO_SYSTEM_PROMPT(memoryJson)
-
-    const response = await groq.chat.completions.create({
-      model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...chatMessages.map((m) => ({ role: m.role, content: m.content })),
-      ],
-      max_tokens: 600,
-      temperature: 0.75,
+    const result = runKairoAgent({
+      activeIncident,
+      retrievedMemory,
+      latestUserMessage,
     })
 
-    const rawContent = response.choices[0]?.message?.content
-    const cleaned = cleanModelOutput(rawContent)
-    const missingModel =
-      !cleaned || cleaned === "No response generated."
-
-    let responseText: string
-    if (missingModel) {
-      responseText =
-        guidanceIntent && anchorMatches.length
-          ? formatWhatToDoNowBlock(anchorMatches)
-          : "No response from model. Try again."
-    } else {
-      responseText = cleaned
-    }
-
-    return NextResponse.json({
-      response: responseText,
-      memoryMatches: anchorMatches.length,
-      recalledIncidents: anchorMatches,
-    })
+    return NextResponse.json(result)
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Chat request failed"
     return NextResponse.json({ error: errMsg }, { status: 500 })
