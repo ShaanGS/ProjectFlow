@@ -17,6 +17,9 @@ export function LiveIncidentsPage({
   onSelectIncident,
   onResolveIncident,
   resolvingIncidentId,
+  incidentListStatus,
+  incidentListError,
+  flowError,
 }: {
   activeIncidents: DisplayIncident[]
   resolvedIncidents: DisplayIncident[]
@@ -29,6 +32,9 @@ export function LiveIncidentsPage({
   onSelectIncident: (incident: DisplayIncident) => void
   onResolveIncident: (incident: DisplayIncident) => void
   resolvingIncidentId: string | null | undefined
+  incidentListStatus: LoadStatus
+  incidentListError: string | null
+  flowError: string | null
 }) {
   const memoryHits = memoryMatches.length
   const timeSavedLabel = timeSavedMinutes > 0 ? `${timeSavedMinutes}m` : "0m"
@@ -82,6 +88,12 @@ export function LiveIncidentsPage({
         </div>
       )}
 
+      {flowError && (
+        <div className="border-b border-red-100 bg-red-50 px-8 py-3 text-[12px] font-semibold text-red-700">
+          {flowError}
+        </div>
+      )}
+
       {/* Incident Tables */}
       <div className="flex-1">
         <IncidentTable
@@ -101,6 +113,8 @@ export function LiveIncidentsPage({
         <IncidentTable
           incidents={resolvedIncidents}
           isResolved
+          listStatus={incidentListStatus}
+          listError={incidentListError}
           onSelectIncident={onSelectIncident}
           onResolveIncident={onResolveIncident}
           resolvingIncidentId={resolvingIncidentId}
@@ -137,6 +151,8 @@ function IncidentTable({
   incidents,
   isResolved = false,
   memoryStatus,
+  listStatus = "loaded",
+  listError,
   onSelectIncident,
   onResolveIncident,
   resolvingIncidentId,
@@ -144,14 +160,28 @@ function IncidentTable({
   incidents: DisplayIncident[]
   isResolved?: boolean
   memoryStatus?: LoadStatus
+  listStatus?: LoadStatus
+  listError?: string | null
   onSelectIncident: (incident: DisplayIncident) => void
   onResolveIncident: (incident: DisplayIncident) => void
   resolvingIncidentId?: string | null
 }) {
   return (
     <div className={cn("bg-white", isResolved && "opacity-70")}>
+      {isResolved && listStatus === "loading" && (
+        <div className="space-y-3 px-8 py-4">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="h-[54px] rounded-lg border border-gray-100 bg-gray-50" />
+          ))}
+        </div>
+      )}
+      {isResolved && listStatus === "error" && (
+        <div className="px-8 py-5 text-[13px] font-medium text-red-700">
+          {listError ?? "retrieval failed while loading incidents"}
+        </div>
+      )}
       {/* Rows */}
-      {incidents.map((incident) => (
+      {listStatus !== "error" && incidents.map((incident) => (
         <div
           key={incident.id}
           onClick={() => onSelectIncident(incident)}

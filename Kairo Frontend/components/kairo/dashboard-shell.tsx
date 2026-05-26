@@ -19,6 +19,15 @@ interface AgentMessage {
   analysis?: AgentReasoning
 }
 
+type ApiEnvelope<T> =
+  | { success: true; data: T }
+  | { success: false; error: string; code: string }
+
+function unwrapApi<T>(payload: ApiEnvelope<T>): T {
+  if (!payload.success) throw new Error(payload.error)
+  return payload.data
+}
+
 function mapSeverity(severity: string): DisplayIncident["severity"] {
   if (severity === "SEV-1") return "critical"
   if (severity === "SEV-2") return "warning"
@@ -69,14 +78,23 @@ export function DashboardShell() {
   const [reasoningStatus, setReasoningStatus] = useState<LoadStatus>("idle")
   const [agentAnalysis, setAgentAnalysis] = useState<AgentReasoning | null>(null)
   const [isResolving, setIsResolving] = useState(false)
+  const [incidentListStatus, setIncidentListStatus] = useState<LoadStatus>("loading")
+  const [incidentListError, setIncidentListError] = useState<string | null>(null)
+  const [flowError, setFlowError] = useState<string | null>(null)
+  const [agentThreadKey, setAgentThreadKey] = useState(0)
 
   useEffect(() => {
     fetch("/api/incidents")
       .then((response) => response.json())
-      .then((data) => {
+      .then((payload: ApiEnvelope<{ incidents: ApiIncident[] }>) => {
+        const data = unwrapApi(payload)
         setResolvedIncidents((data.incidents ?? []).map(mapResolvedIncident))
+        setIncidentListStatus("loaded")
       })
-      .catch(console.error)
+      .catch(() => {
+        setIncidentListStatus("error")
+        setIncidentListError("retrieval failed while loading incident memory")
+      })
   }, [])
 
   const allIncidents = [...activeIncidents, ...resolvedIncidents]
@@ -205,6 +223,9 @@ export function DashboardShell() {
             onSelectIncident={handleSelectIncident}
             onResolveIncident={handleResolveIncident}
             resolvingIncidentId={isResolving ? activeIncident?.incident_id : null}
+            incidentListStatus={incidentListStatus}
+            incidentListError={incidentListError}
+            flowError={flowError}
           />
         )
       case "vendors":
@@ -227,6 +248,9 @@ export function DashboardShell() {
             onSelectIncident={handleSelectIncident}
             onResolveIncident={handleResolveIncident}
             resolvingIncidentId={isResolving ? activeIncident?.incident_id : null}
+            incidentListStatus={incidentListStatus}
+            incidentListError={incidentListError}
+            flowError={flowError}
           />
         )
     }
@@ -238,14 +262,19 @@ export function DashboardShell() {
     setReasoningStatus("loading")
     setMemoryMatches([])
     setAgentAnalysis(null)
+    setFlowError(null)
+    setAgentThreadKey((previous) => previous + 1)
 
     const memoryResponse = await fetch("/api/incidents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentIncident: incident }),
     })
-    const memoryData = await memoryResponse.json()
-    if (!memoryResponse.ok) throw new Error(memoryData.error ?? "Failed to retrieve memory")
+    const memoryPayload = await memoryResponse.json()
+    if (!memoryResponse.ok || !memoryPayload.success) {
+      throw new Error(memoryPayload.error ?? "retrieval failed")
+    }
+    const memoryData = memoryPayload.data
 
     const matches = (memoryData.matches ?? []) as MemoryMatch[]
     setMemoryMatches(matches)
@@ -265,8 +294,11 @@ export function DashboardShell() {
         ],
       }),
     })
-    const chatData = await chatResponse.json()
-    if (!chatResponse.ok) throw new Error(chatData.error ?? "Failed to load Kairo reasoning")
+    const chatPayload = await chatResponse.json()
+    if (!chatResponse.ok || !chatPayload.success) {
+      throw new Error(chatPayload.error ?? "analysis failed")
+    }
+    const chatData = chatPayload.data
 
     const chatMatches = (chatData.recalledIncidents ?? matches) as MemoryMatch[]
     setMemoryMatches(chatMatches)
@@ -295,6 +327,7 @@ export function DashboardShell() {
       const message = error instanceof Error ? error.message : "Failed to select incident"
       setMemoryStatus("error")
       setReasoningStatus("error")
+      setFlowError(`retrieval/analysis failed: ${message}`)
       setAgentMessage({
         id: `select_error_${Date.now()}`,
         role: "assistant",
@@ -342,7 +375,7 @@ export function DashboardShell() {
         }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error ?? "Failed to resolve incident")
+      if (!response.ok || !data.success) throw new Error(data.error ?? "resolve failed")
 
       setActiveIncidents((previous) => previous.filter((item) => item.id !== incident.id))
       setResolvedIncidents((previous) => [
@@ -369,6 +402,7 @@ export function DashboardShell() {
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to resolve incident"
+      setFlowError(`resolve failed: ${message}`)
       setAgentMessage({
         id: `resolve_error_${Date.now()}`,
         role: "assistant",
@@ -388,6 +422,9 @@ export function DashboardShell() {
     setMemoryStatus("loading")
     setReasoningStatus("loading")
     setMemoryMatches([])
+    setAgentAnalysis(null)
+    setFlowError(null)
+    setAgentThreadKey((previous) => previous + 1)
 
     try {
       const response = await fetch("/api/alert", {
@@ -396,11 +433,12 @@ export function DashboardShell() {
         body: JSON.stringify({ index: simulationCounter }),
       })
 
-      const data = await response.json()
+      const alertPayload = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.error ?? "Failed to simulate incident")
+      if (!response.ok || !alertPayload.success) {
+        throw new Error(alertPayload.error ?? "alert failed")
       }
+      const data = alertPayload.data
 
       const incident = data.incident as ApiIncident
       const incidentDescription = [
@@ -453,11 +491,12 @@ export function DashboardShell() {
           ],
         }),
       })
-      const chatData = await chatResponse.json()
+      const chatPayload = await chatResponse.json()
 
-      if (!chatResponse.ok) {
-        throw new Error(chatData.error ?? "Failed to load Kairo reasoning")
+      if (!chatResponse.ok || !chatPayload.success) {
+        throw new Error(chatPayload.error ?? "analysis failed")
       }
+      const chatData = chatPayload.data
 
       // If chat returned fresher matches (it re-recalled), keep the larger set
       const chatMatches = (chatData.recalledIncidents ?? []) as MemoryMatch[]
@@ -485,6 +524,7 @@ export function DashboardShell() {
       const message = error instanceof Error ? error.message : "Failed to simulate incident"
       setMemoryStatus((previous) => (previous === "loaded" ? previous : "error"))
       setReasoningStatus("error")
+      setFlowError(`retrieval/analysis failed: ${message}`)
       setAgentMessage({
         id: `sim_error_${Date.now()}`,
         role: "assistant",
@@ -535,6 +575,7 @@ export function DashboardShell() {
         memoryStatus={memoryStatus}
         reasoningStatus={reasoningStatus}
         agentAnalysis={agentAnalysis}
+        agentThreadKey={agentThreadKey}
       />
     </div>
   )

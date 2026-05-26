@@ -1,82 +1,103 @@
 # Kairo
 
-Kairo is a memory-backed incident copilot prototype for vendor and external-service failures. The current app demonstrates a simulated incident loop: trigger an incident, retrieve similar past incidents, generate a memory-grounded response, and show the evidence in the existing dashboard UI.
+Kairo is a memory-native incident copilot prototype for vendor and external-service failures. The current system demonstrates a complete local demo loop: simulate an incident, retrieve similar historical incidents from canonical memory, generate structured memory-grounded reasoning, resolve the incident, and retain the resolution for future retrieval.
 
-This cleanup pass intentionally preserves the current UI and behavior while making the real execution path easier to understand.
-
-## Stack
+## Tech Stack
 
 - Next.js App Router
 - React 19
 - TypeScript
 - Tailwind CSS
 - Lucide icons
-- Hindsight memory client with local JSON fallback
-- Groq SDK for optional LLM mode
+- Local canonical incident memory in `data/incidents-seed.json`
+- Deterministic retrieval in `lib/retrieval`
+- Structured agent runtime in `lib/agent`
+- Supabase schema migration prepared under `supabase/migrations`
+- Optional Groq configuration for future LLM-backed reasoning
 
-## Run
+## Folder Structure
+
+```text
+app/          Next.js pages and API routes
+components/   Kairo dashboard UI
+data/         Canonical demo incident dataset
+docs/         Architecture, flow, demo, and cleanup documentation
+lib/          Config, db helpers, retrieval, memory, agent, retention
+public/       UI assets
+supabase/     Database migrations
+types/        Shared TypeScript domain and API types
+archive/      Legacy/unverified code preserved outside the active path
+```
+
+## Run Locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Validate types:
+Validate TypeScript:
 
 ```bash
 npm run lint
 ```
 
-## Folder Structure
+Health check:
 
-```text
-app/          Next.js page and API routes
-components/   Active Kairo UI components
-data/         Local incident dataset used for seed/fallback/demo data
-lib/          Retrieval, memory, Groq, and formatting helpers
-public/       Assets referenced by the active UI
-types/        Shared TypeScript types for the active app
-docs/         Wiring, architecture, data-flow, and cleanup docs
-archive/      Unused or unverified legacy code/assets preserved for review
+```bash
+curl http://localhost:3000/api/health
 ```
 
-## Current Data Sources
+`/api/health` returns `degraded` when `GROQ_API_KEY` is not set because the local deterministic agent works without an LLM, but the LLM readiness check is intentionally false.
 
-- `data/incidents.json` is the canonical local incident dataset.
-- `app/api/incidents/route.ts` returns that dataset for the resolved incident table.
-- `lib/hindsight.ts` uses Hindsight when configured and falls back to local scoring over `data/incidents.json` when not configured.
-- `app/api/alert/route.ts` uses an in-code `SIMULATED_ALERTS` list to create current incidents for the demo.
+## Demo Flow
 
-## API Routes
+1. Open `http://localhost:3000`.
+2. Click `Simulate Incident`.
+3. Watch the Live Incidents row become active.
+4. Review the Episodic Memory panel for retrieved prior incidents.
+5. Review the Kairo Agent panel for structured diagnosis, likely cause, actions, checks to skip, uncertainty, and memory references.
+6. Click `Resolve`.
+7. Confirm the write-back message appears.
+8. Click `Simulate Incident` again to repeat the loop.
 
-- `POST /api/seed` seeds `data/incidents.json` into Hindsight when Hindsight env vars are configured.
-- `GET /api/incidents` returns local incidents for the resolved incident table.
-- `POST /api/incidents` performs retrieval by description, but the current UI does not call this path.
-- `POST /api/alert` creates a simulated alert, retrieves memory, and returns the active incident plus recalled episodes.
-- `POST /api/chat` generates a memory-grounded agent response from provided or recalled episodes.
-- `POST /api/resolve` writes a resolved incident to memory, but the current UI does not call it.
-- `POST /api/retain` directly writes one incident to memory, but the current UI does not call it.
+The demo loop is designed to run repeatedly without reloading.
 
-## What Is Real vs Mock
+## What Is Real vs Simulated
 
-Real or partially real:
+Real in the current prototype:
 
-- The visible Simulate Incident flow is wired to `/api/alert` and `/api/chat`.
-- Retrieval goes through `lib/hindsight.ts`.
-- Hindsight is used when configured; otherwise local fallback scoring is used.
-- The right panel and live incident table show recalled episodes from the active flow.
+- Canonical incident dataset with 20 realistic vendor incidents.
+- Deterministic retrieval over incident memory.
+- Structured reasoning grounded in retrieved memory.
+- Dashboard panels driven by live API state.
+- Resolution write-back through `/api/resolve`.
+- Runtime retained incidents becoming eligible for later retrieval.
+- Consistent API response envelopes and demo health check.
 
-Still mock/static:
+Simulated or local-only:
 
-- Simulated current incidents are local constants in `app/api/alert/route.ts`.
-- `MemoryLogPage`, `VendorsOverviewPage`, `VendorProfilePage`, and `PatternRulesPage` use hardcoded component-local data.
-- Agent empty-state metrics are hardcoded.
-- Resolve/write-back exists as an API route but has no visible UI flow.
+- Incident triggers come from canonical seed data through `/api/alert`.
+- Retention is in process memory for the local demo, not yet persisted to Supabase.
+- The agent runtime is deterministic unless a future LLM path is explicitly wired.
+- Supabase migrations exist, but the UI still uses the local data/retention layer.
 
-## Next Phase
+## API Contract
 
-1. Decide whether Hindsight or another store is the canonical memory backend.
-2. Replace static secondary pages with data from the canonical incident/memory source.
-3. Add a visible Resolve Incident flow that calls `/api/resolve`.
-4. Replace local simulated incidents with a curated realistic incident dataset.
-5. Add focused tests for retrieval fallback, API response contracts, and the simulate flow.
+Most API success responses use:
+
+```json
+{ "success": true, "data": {} }
+```
+
+Most API errors use:
+
+```json
+{ "success": false, "error": "short message", "code": "ERROR_CODE" }
+```
+
+`/api/health` intentionally returns the health-check shape documented in `docs/demo-script.md`.
+
+## Next Build Phase
+
+The next phase is persistence and productionization: replace the in-memory retention layer with Supabase writes, persist `analysis_runs` and `memory_matches`, add tests around the API contracts and retrieval rankings, and optionally reintroduce an LLM behind the existing structured agent response shape.

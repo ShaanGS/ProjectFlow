@@ -11,7 +11,7 @@ import {
   FileDown,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { ApiIncident, MemoryMatch } from "@/types/kairo"
+import type { ApiIncident, LoadStatus, MemoryMatch } from "@/types/kairo"
 import type { AgentReasoning } from "@/types/agent"
 
 /** First assistant message that looks like the structured incident brief (LLM, demo, or channel update). */
@@ -75,6 +75,8 @@ interface AgentChatProps {
   injectedMessage: Message | null
   memoryMatches?: MemoryMatch[]
   agentAnalysis?: AgentReasoning | null
+  reasoningStatus: LoadStatus
+  threadKey: number
 }
 
 export function AgentChat({
@@ -82,11 +84,17 @@ export function AgentChat({
   injectedMessage,
   memoryMatches = [],
   agentAnalysis,
+  reasoningStatus,
+  threadKey,
 }: AgentChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setMessages([])
+  }, [threadKey])
 
   useEffect(() => {
     if (!injectedMessage) return
@@ -153,11 +161,12 @@ export function AgentChat({
           past_episodes: memoryMatches.length > 0 ? memoryMatches : undefined,
         }),
       })
-      const data = await response.json()
+      const payload = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.error ?? "Failed to contact Kairo")
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "analysis failed")
       }
+      const data = payload.data
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -167,7 +176,7 @@ export function AgentChat({
       }
       setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to contact Kairo"
+      const message = error instanceof Error ? error.message : "analysis failed"
       setMessages((prev) => [
         ...prev,
         {
@@ -248,7 +257,11 @@ export function AgentChat({
             </div>
 
             <p className="mb-8 max-w-[220px] text-center text-[13px] text-gray-500">
-              Query incident history, vendor patterns, and memory logs.
+              {reasoningStatus === "loading"
+                ? "Analyzing retrieved incident memory..."
+                : reasoningStatus === "error"
+                  ? "analysis failed; simulate again or select another incident."
+                  : "Query incident history, vendor patterns, and memory logs."}
             </p>
 
             {/* Metrics Row */}

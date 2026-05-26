@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { runKairoAgent } from "@/lib/agent/runtime"
 import { canonicalIncidentSeed } from "@/lib/db/incidents"
+import "@/lib/config/env"
 import { seedIncidentToActiveContext } from "@/lib/memory/incident-memory"
 import { retrieveSimilarIncidents } from "@/lib/retrieval/incidents"
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       latestUserMessage: `Analyze active incident: ${incident.title}`,
     })
 
-    return NextResponse.json({
+    return NextResponse.json({ success: true, data: {
       incident,
       memoryMatches: recalled.matches.length,
       classification: "vendor_side",
@@ -65,9 +66,12 @@ export async function POST(req: NextRequest) {
         query: recalled.query,
         source: "data/incidents-seed.json",
       },
-    })
+    }})
   } catch (error) {
     const message = error instanceof Error ? error.message : "Alert simulation failed"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { success: false, error: message, code: "ALERT_SIMULATION_FAILED" },
+      { status: 500 }
+    )
   }
 }

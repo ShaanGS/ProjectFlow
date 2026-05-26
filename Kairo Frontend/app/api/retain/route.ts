@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import "@/lib/config/env"
 import { retainResolvedIncident } from "@/lib/retention/store"
 
 export async function POST(req: NextRequest) {
@@ -25,14 +26,17 @@ export async function POST(req: NextRequest) {
       notes: "Compatibility write through /api/retain; canonical path is /api/resolve.",
     })
 
-    return NextResponse.json({
+    return NextResponse.json({ success: true, data: {
       success: true,
       incident: retained.incident,
       resolution: retained.resolution,
       message: "Incident retained through canonical Kairo write-back path",
-    })
+    }})
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to retain incident"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { success: false, error: message, code: "RETAIN_WRITEBACK_FAILED" },
+      { status: 500 }
+    )
   }
 }

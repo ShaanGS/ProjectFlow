@@ -9,7 +9,10 @@ export default function KairoPage() {
 
     if (!seeded) {
       fetch("/api/seed", { method: "POST" })
-        .then(() => localStorage.setItem("kairo_seeded", "true"))
+        .then((response) => response.json())
+        .then((payload) => {
+          if (payload.success) localStorage.setItem("kairo_seeded", "true")
+        })
         .catch(console.error)
     }
   }, [])

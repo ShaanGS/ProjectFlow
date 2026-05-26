@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import "@/lib/config/env"
 import { retainResolvedIncident } from "@/lib/retention/store"
 import type { ActiveIncidentContext } from "@/types/agent"
 
@@ -18,12 +19,19 @@ export async function POST(req: Request) {
     const rootCause = String(body.root_cause ?? body.actual_root_cause ?? "").trim()
 
     if (!incident || !incident.title) {
-      return NextResponse.json({ error: "Missing incident context" }, { status: 400 })
+      return NextResponse.json(
+        { success: false, error: "Missing incident context", code: "RESOLVE_INCIDENT_MISSING" },
+        { status: 400 }
+      )
     }
 
     if (!fixApplied || !rootCause) {
       return NextResponse.json(
-        { error: "Missing fix_applied or root_cause for resolution write-back" },
+        {
+          success: false,
+          error: "Missing fix_applied or root_cause for resolution write-back",
+          code: "RESOLVE_DETAILS_MISSING",
+        },
         { status: 400 }
       )
     }
@@ -44,15 +52,18 @@ export async function POST(req: Request) {
       notes: body.notes ? String(body.notes) : undefined,
     })
 
-    return NextResponse.json({
+    return NextResponse.json({ success: true, data: {
       success: true,
       incident: retained.incident,
       resolution: retained.resolution,
       message: "Incident resolution retained as Kairo memory",
-    })
+    }})
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to resolve incident"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { success: false, error: message, code: "RESOLVE_WRITEBACK_FAILED" },
+      { status: 500 }
+    )
   }
 }

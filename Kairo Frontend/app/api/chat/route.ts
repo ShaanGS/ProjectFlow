@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { runKairoAgent } from "@/lib/agent/runtime"
+import "@/lib/config/env"
 import type { ActiveIncidentContext, RetrievedMemoryIncident } from "@/types/agent"
 
 type ChatTurn = { role: "user" | "assistant"; content: string }
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     if (!chatMessages.length) {
       return NextResponse.json(
-        { error: "Missing messages or message" },
+        { success: false, error: "Missing messages or message", code: "CHAT_INPUT_MISSING" },
         { status: 400 }
       )
     }
@@ -87,9 +88,12 @@ export async function POST(req: NextRequest) {
       latestUserMessage,
     })
 
-    return NextResponse.json(result)
+    return NextResponse.json({ success: true, data: result })
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Chat request failed"
-    return NextResponse.json({ error: errMsg }, { status: 500 })
+    return NextResponse.json(
+      { success: false, error: errMsg, code: "CHAT_REQUEST_FAILED" },
+      { status: 500 }
+    )
   }
 }

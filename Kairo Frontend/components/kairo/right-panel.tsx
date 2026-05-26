@@ -16,6 +16,7 @@ interface RightPanelProps {
   memoryStatus: LoadStatus
   reasoningStatus: LoadStatus
   agentAnalysis: AgentReasoning | null
+  agentThreadKey: number
 }
 
 export function RightPanel({
@@ -25,6 +26,7 @@ export function RightPanel({
   memoryStatus,
   reasoningStatus,
   agentAnalysis,
+  agentThreadKey,
 }: RightPanelProps) {
   return (
     <div className="hidden h-full w-[340px] min-w-[340px] flex-col border-l border-gray-100 bg-white xl:flex">
@@ -110,6 +112,8 @@ export function RightPanel({
           injectedMessage={injectedMessage}
           memoryMatches={memoryMatches}
           agentAnalysis={agentAnalysis}
+          reasoningStatus={reasoningStatus}
+          threadKey={agentThreadKey}
         />
       </div>
     </div>

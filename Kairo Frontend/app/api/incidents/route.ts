@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { canonicalIncidentSeed } from "@/lib/db/incidents"
+import "@/lib/config/env"
 import { retrieveSimilarIncidents } from "@/lib/retrieval/incidents"
 import type { RetrievalRequest } from "@/types/agent"
 
@@ -75,10 +76,18 @@ function requestFromBody(body: Record<string, unknown>): RetrievalRequest {
 }
 
 export async function GET() {
-  return NextResponse.json({
-    incidents: canonicalIncidentSeed.map(toLegacyApiIncident),
-    source: "data/incidents-seed.json",
-  })
+  try {
+    return NextResponse.json({ success: true, data: {
+      incidents: canonicalIncidentSeed.map(toLegacyApiIncident),
+      source: "data/incidents-seed.json",
+    }})
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Incident dataset failed"
+    return NextResponse.json(
+      { success: false, error: message, code: "INCIDENT_DATASET_FAILED" },
+      { status: 500 }
+    )
+  }
 }
 
 export async function POST(req: Request) {
@@ -98,14 +107,14 @@ export async function POST(req: Request) {
 
     if (!description) {
       return NextResponse.json(
-        { error: "Missing incident description" },
+        { success: false, error: "Missing incident description", code: "INCIDENT_DESCRIPTION_MISSING" },
         { status: 400 }
       )
     }
 
     const recalled = retrieveSimilarIncidents(retrievalRequest)
 
-    return NextResponse.json({
+    return NextResponse.json({ success: true, data: {
       matches: recalled.matches,
       incidents: recalled.matches.map((match) => ({
         id: match.matched_incident_id,
@@ -125,10 +134,13 @@ export async function POST(req: Request) {
       })),
       query: recalled.query,
       source: "data/incidents-seed.json",
-    })
+    }})
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Incident retrieval failed"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { success: false, error: message, code: "INCIDENT_RETRIEVAL_FAILED" },
+      { status: 500 }
+    )
   }
 }
