@@ -98,6 +98,12 @@ export function LiveIncidentsPage({
 
       {/* Incident Tables */}
       <div className="flex-1">
+        <div className="flex items-center gap-3 px-6 py-4">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+            live incident queue
+          </span>
+          <div className="h-px flex-1 bg-gray-100" />
+        </div>
         <IncidentTable
           incidents={activeIncidents}
           memoryStatus={memoryStatus}
@@ -108,7 +114,9 @@ export function LiveIncidentsPage({
         
         {/* Resolved divider */}
         <div className="flex items-center gap-3 border-t border-gray-100 px-6 py-6">
-          <span className="text-[11px] text-gray-500">resolved</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+            memory corpus / resolved history
+          </span>
           <div className="flex-1 h-px bg-gray-100" />
         </div>
         
@@ -222,6 +230,11 @@ function IncidentTable({
           {listError ?? "retrieval failed while loading incidents"}
         </div>
       )}
+      {!isResolved && incidents.length === 0 && (
+        <div className="border-b border-gray-100 px-6 py-8 text-[13px] font-medium text-gray-500">
+          No live incidents. Simulate an incident to start retrieval and analysis.
+        </div>
+      )}
       {/* Rows */}
       {listStatus !== "error" && incidents.map((incident, index) => (
         <div
@@ -274,7 +287,11 @@ function IncidentTable({
                 incident.status === "resolved" && "bg-[#00A651]/10 text-[#00A651]"
               )}
             >
-              {incident.status === "live" ? "Live" : "Resolved"}
+              {incident.status === "live"
+                ? "Live"
+                : isResolved && incident.time !== "Resolved now"
+                  ? "Memory"
+                  : "Resolved"}
             </span>
           </div>
 

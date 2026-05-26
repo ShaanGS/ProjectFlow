@@ -60,9 +60,9 @@ function buildMemoryGroundedReasoning(
   const vendor = incident.vendor ?? top.vendor
 
   return {
-    diagnosis: `${incident.title ?? "The active incident"} resembles ${top.title} (${top.vendor}) with ${Math.round(
-      top.similarity * 100
-    )}% similarity.`,
+    diagnosis: `${incident.title ?? "The active incident"} resembles ${top.title} (${top.vendor}) with ${formatEvidenceStrength(
+      top.similarity
+    )} evidence strength.`,
     likely_cause:
       top.root_cause ??
       `Likely ${vendor} degradation based on the closest memory match, but the root cause was not stored.`,
@@ -101,10 +101,16 @@ export function renderAgentReasoning(reasoning: AgentReasoning) {
     "MEMORY_REFERENCES:",
     ...(reasoning.referenced_memory_incidents.length
       ? reasoning.referenced_memory_incidents.map(
-          (ref) => `- ${ref.id} | ${ref.vendor} | ${Math.round(ref.similarity * 100)}% | ${ref.title}`
+          (ref) => `- ${ref.id} | ${ref.vendor} | ${formatEvidenceStrength(ref.similarity)} | ${ref.title}`
         )
       : ["- none"]),
   ].join("\n")
+}
+
+function formatEvidenceStrength(similarity: number) {
+  if (similarity >= 0.82) return "strong"
+  if (similarity >= 0.58) return "moderate"
+  return "weak"
 }
 
 export function runKairoAgent(input: RuntimeInput): AgentRuntimeResponse {

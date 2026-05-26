@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { classifyChatIntent, conversationalResponse } from "@/lib/agent/intent"
 import { runKairoAgent } from "@/lib/agent/runtime"
 import "@/lib/config/env"
 import type { ActiveIncidentContext, RetrievedMemoryIncident } from "@/types/agent"
@@ -79,8 +80,29 @@ export async function POST(req: NextRequest) {
     const latestUserMessage =
       [...chatMessages].reverse().find((message) => message.role === "user")?.content ?? ""
 
-    const activeIncident = activeIncidentFromBody(body, latestUserMessage)
+    const hasActiveIncident = Boolean(
+      body.currentIncident &&
+        typeof body.currentIncident === "object" &&
+        Object.keys(body.currentIncident as Record<string, unknown>).length > 0
+    )
+    const intent = classifyChatIntent({ message: latestUserMessage, hasActiveIncident })
     const retrievedMemory = normalizeMemoryMatches(body)
+
+    if (intent === "greeting_or_smalltalk" || intent === "general_question") {
+      return NextResponse.json({
+        success: true,
+        data: {
+          response: conversationalResponse(intent),
+          analysis: null,
+          memoryMatches: 0,
+          recalledIncidents: [],
+          intent,
+          stages: [],
+        },
+      })
+    }
+
+    const activeIncident = activeIncidentFromBody(body, latestUserMessage)
 
     const result = runKairoAgent({
       activeIncident,
@@ -88,7 +110,7 @@ export async function POST(req: NextRequest) {
       latestUserMessage,
     })
 
-    return NextResponse.json({ success: true, data: result })
+    return NextResponse.json({ success: true, data: { ...result, intent } })
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Chat request failed"
     return NextResponse.json(

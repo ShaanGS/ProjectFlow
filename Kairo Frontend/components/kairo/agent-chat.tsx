@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ApiIncident, LoadStatus, MemoryMatch } from "@/types/kairo"
-import type { AgentReasoning, AgentRuntimeResponse } from "@/types/agent"
+import type { AgentReasoning, AgentRuntimeResponse, ChatInteractionIntent } from "@/types/agent"
 
 /** First assistant message that looks like the structured incident brief (LLM, demo, or channel update). */
 function findIncidentBriefText(messages: Message[]): string | null {
@@ -68,7 +68,7 @@ function buildPostMortemMarkdown({
     ? memoryMatches.map((match) => {
         const meta = match.metadata ?? {}
         return `- ${match.title ?? meta.title ?? match.id} (${match.vendor ?? meta.vendor ?? "unknown"}, ${
-          typeof match.similarity === "number" ? `${Math.round(match.similarity * 100)}% similar` : "memory match"
+          typeof match.similarity === "number" ? `${formatEvidenceStrength(match.similarity)} evidence` : "memory match"
         })`
       })
     : ["- No memory references captured."]
@@ -128,6 +128,8 @@ interface Message {
   role: "user" | "assistant"
   content: string
   analysis?: AgentReasoning
+  intent?: ChatInteractionIntent
+  stages?: AgentRuntimeResponse["stages"]
 }
 
 const suggestionCards = [
@@ -254,7 +256,9 @@ export function AgentChat({
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: data.response,
-        analysis: data.analysis,
+        analysis: data.analysis ?? undefined,
+        intent: data.intent,
+        stages: data.stages ?? [],
       }
       setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
@@ -374,7 +378,12 @@ export function AgentChat({
           </div>
         ) : (
           <div className="flex flex-col gap-4 px-6 py-5">
-            <ReasoningStages status={reasoningStatus} stages={agentStages} />
+            {(agentStages.length > 0 || messages.some((message) => message.analysis)) && (
+              <ReasoningStages
+                status={reasoningStatus === "idle" ? "loaded" : reasoningStatus}
+                stages={agentStages.length ? agentStages : latestMessageStages(messages)}
+              />
+            )}
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -386,7 +395,7 @@ export function AgentChat({
                 {message.role === "assistant" && (
                   <div className="mb-1.5 flex flex-wrap items-center gap-2">
                     <span className="text-[11px] font-semibold text-teal-600">Kairo</span>
-                    {(message.content.includes("MEMORY_REF") || message.analysis) && (
+                    {message.analysis && (
                       <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
                         Memory Active
                       </span>
@@ -496,6 +505,14 @@ function ReasoningStages({
   )
 }
 
+function latestMessageStages(messages: Message[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const stages = messages[index].stages
+    if (stages?.length) return stages
+  }
+  return []
+}
+
 function StructuredReasoning({
   analysis,
   memoryMatches,
@@ -503,7 +520,7 @@ function StructuredReasoning({
   analysis: AgentReasoning
   memoryMatches: MemoryMatch[]
 }) {
-  const confidence = analysis.referenced_memory_incidents[0]?.similarity
+  const evidenceStrength = analysis.referenced_memory_incidents[0]?.similarity
   const evidence = analysis.referenced_memory_incidents.length
     ? analysis.referenced_memory_incidents
     : memoryMatches.slice(0, 3).map((match) => ({
@@ -547,10 +564,10 @@ function StructuredReasoning({
           <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
             <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">
               <BadgeCheck className="h-3 w-3" />
-              Confidence
+              Evidence strength
             </div>
             <p className="text-[18px] font-bold text-gray-950">
-              {typeof confidence === "number" ? `${Math.round(confidence * 100)}%` : "Measured"}
+              {typeof evidenceStrength === "number" ? formatEvidenceStrength(evidenceStrength) : "Measured"}
             </p>
           </div>
           <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
@@ -570,7 +587,7 @@ function StructuredReasoning({
               <div key={ref.id} className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">
                 <p className="truncate text-[11px] font-semibold text-gray-900">{ref.title}</p>
                 <p className="text-[10px] text-gray-500">
-                  {ref.vendor} · {Math.round(ref.similarity * 100)}% similar
+                  {ref.vendor} · {formatEvidenceStrength(ref.similarity)} evidence
                 </p>
               </div>
             ))}
@@ -579,6 +596,12 @@ function StructuredReasoning({
       </div>
     </div>
   )
+}
+
+function formatEvidenceStrength(similarity: number) {
+  if (similarity >= 0.82) return "strong"
+  if (similarity >= 0.58) return "moderate"
+  return "weak"
 }
 
 function ReportSection({

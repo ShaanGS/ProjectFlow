@@ -402,11 +402,15 @@ export function DashboardShell() {
         ...previous,
       ])
       setActiveIncident(null)
+      setMemoryMatches([])
+      setMemoryStatus("idle")
+      setReasoningStatus("idle")
+      setAgentAnalysis(null)
+      setAgentStages([])
       setAgentMessage({
         id: `resolved_${Date.now()}`,
         role: "assistant",
         content: `WRITE_BACK_COMPLETE: ${incident.name}\nStored resolution as retrievable Kairo memory via /api/resolve.\nResolution: ${fixApplied}`,
-        analysis: analysis ?? undefined,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to resolve incident"

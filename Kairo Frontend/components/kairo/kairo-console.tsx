@@ -255,7 +255,7 @@ function MemoryGraph({
                 </span>
                 <span className="mt-1 block text-[13px] font-bold text-gray-950">
                   {typeof match.similarity === "number"
-                    ? `${Math.round(match.similarity * 100)}%`
+                    ? formatEvidenceStrength(match.similarity)
                     : "match"}
                 </span>
                 <span className="mt-1 block truncate text-[10px] font-semibold text-gray-500">
@@ -291,7 +291,7 @@ function MemoryDetailCard({ match }: { match: MemoryMatch }) {
         </div>
         {typeof match.similarity === "number" && (
           <span className="shrink-0 rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-bold text-teal-700">
-            {Math.round(match.similarity * 100)}%
+            {formatEvidenceStrength(match.similarity)}
           </span>
         )}
       </div>
@@ -350,4 +350,10 @@ function getRelationCue(activeIncident: ApiIncident | null, match: MemoryMatch) 
   const activeSignals = new Set([...(activeIncident.symptoms ?? []), ...(activeIncident.tags ?? [])])
   const overlap = [...(match.signals ?? []), ...(match.tags ?? [])].find((signal) => activeSignals.has(signal))
   return overlap ? "shared signal" : "similar failure mode"
+}
+
+function formatEvidenceStrength(similarity: number) {
+  if (similarity >= 0.82) return "strong"
+  if (similarity >= 0.58) return "moderate"
+  return "weak"
 }

@@ -85,11 +85,18 @@ export interface AgentReasoning {
   }>
 }
 
+export type ChatInteractionIntent =
+  | "greeting_or_smalltalk"
+  | "general_question"
+  | "incident_description"
+  | "incident_followup"
+
 export interface AgentRuntimeResponse {
   response: string
-  analysis: AgentReasoning
+  analysis: AgentReasoning | null
   memoryMatches: number
   recalledIncidents: RetrievedMemoryIncident[]
+  intent?: ChatInteractionIntent
   stages: Array<{
     name: "input" | "retrieval" | "reasoning"
     status: "completed" | "skipped"

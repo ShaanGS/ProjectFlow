@@ -96,7 +96,7 @@ export function retrieveSimilarIncidents(input: RetrievalRequest) {
           ? 0.08
           : 0
       const patternBoost = (input.tags ?? []).some((tag) => incident.tags.includes(tag)) ? 0.08 : 0
-      const similarity = Math.min(0.99, lexical + vendorBoost + serviceBoost + regionBoost + patternBoost)
+      const similarity = Math.min(0.88, lexical + vendorBoost + serviceBoost + regionBoost + patternBoost)
 
       return {
         incident,

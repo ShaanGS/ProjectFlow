@@ -70,7 +70,7 @@ export function RightPanel({
             topMatch
               ? `${topMatchVendor ?? "Unknown vendor"} · ${
                   typeof topMatch.similarity === "number"
-                    ? `${Math.round(topMatch.similarity * 100)}% similar`
+                    ? `${formatEvidenceStrength(topMatch.similarity)} evidence`
                     : "memory evidence"
                 }`
               : "The best historical incident will appear here after retrieval."
@@ -87,7 +87,9 @@ export function RightPanel({
               ? "Matching evidence and preparing an action plan."
               : reasoningStatus === "error"
                 ? "Analysis failed. The incident workspace remains usable."
-                : "Grounded in recalled incident memory."
+                : activeIncident
+                  ? "Grounded in recalled incident memory."
+                  : "No incident context is active."
           }
         />
 
@@ -119,6 +121,12 @@ export function RightPanel({
       </div>
     </aside>
   )
+}
+
+function formatEvidenceStrength(similarity: number) {
+  if (similarity >= 0.82) return "strong"
+  if (similarity >= 0.58) return "moderate"
+  return "weak"
 }
 
 function RailCard({
