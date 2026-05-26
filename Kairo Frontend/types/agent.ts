@@ -13,6 +13,8 @@ export interface ActiveIncidentContext {
   signals?: string[]
   symptoms?: string[]
   customer_impact?: string
+  timestamp_start?: string
+  triggered_at?: string
   tags?: string[]
 }
 

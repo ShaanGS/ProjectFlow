@@ -1,4 +1,4 @@
-import { canonicalIncidentSeed } from "@/lib/db/incidents"
+import { getMemoryIncidents } from "@/lib/retention/store"
 import type { RetrievalRequest, RetrievedMemoryIncident } from "@/types/agent"
 import type { IncidentSeedRecord } from "@/types/kairo-domain"
 import {
@@ -81,7 +81,7 @@ export function retrieveSimilarIncidents(input: RetrievalRequest) {
   const query = buildActiveIncidentText(input)
   const queryTokens = tokenize(query)
 
-  const scored = canonicalIncidentSeed
+  const scored = getMemoryIncidents()
     .filter((incident) => !exclude.has(incident.id))
     .map((incident) => {
       const docTokens = tokenize(buildHistoricalIncidentText(incident))

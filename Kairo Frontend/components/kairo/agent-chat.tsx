@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ApiIncident, MemoryMatch } from "@/types/kairo"
+import type { AgentReasoning } from "@/types/agent"
 
 /** First assistant message that looks like the structured incident brief (LLM, demo, or channel update). */
 function findIncidentBriefText(messages: Message[]): string | null {
@@ -21,7 +22,7 @@ function findIncidentBriefText(messages: Message[]): string | null {
     if (/Kairo request failed/i.test(c)) continue
     const hasBoundary = /BOUNDARY|FAULT BOUNDARY/i.test(c)
     const hasBody =
-      /RESOLUTION_STEPS|RESOLUTION RUNBOOK|ROOT_CAUSE|ROOT_CAUSE_MEMORY/i.test(c)
+      /RESOLUTION_STEPS|RESOLUTION RUNBOOK|ROOT_CAUSE|ROOT_CAUSE_MEMORY|DIAGNOSIS|LIKELY_CAUSE/i.test(c)
     const channelStyle =
       hasBoundary &&
       /OWNER:|ACTION:|STATUS:/i.test(c)
@@ -51,6 +52,7 @@ interface Message {
   id: string
   role: "user" | "assistant"
   content: string
+  analysis?: AgentReasoning
 }
 
 const suggestionCards = [
@@ -72,9 +74,15 @@ interface AgentChatProps {
   activeIncident: ApiIncident | null
   injectedMessage: Message | null
   memoryMatches?: MemoryMatch[]
+  agentAnalysis?: AgentReasoning | null
 }
 
-export function AgentChat({ activeIncident, injectedMessage, memoryMatches = [] }: AgentChatProps) {
+export function AgentChat({
+  activeIncident,
+  injectedMessage,
+  memoryMatches = [],
+  agentAnalysis,
+}: AgentChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
@@ -155,6 +163,7 @@ export function AgentChat({ activeIncident, injectedMessage, memoryMatches = [] 
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: data.response,
+        analysis: data.analysis,
       }
       setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
@@ -244,11 +253,11 @@ export function AgentChat({ activeIncident, injectedMessage, memoryMatches = [] 
 
             {/* Metrics Row */}
             <div className="mb-8 flex items-center justify-center gap-1.5 text-[11px] text-[#6b7280]">
-              <span>14 incidents</span>
+              <span>{memoryMatches.length} memories</span>
               <span>&middot;</span>
-              <span>89% recall</span>
+              <span>{activeIncident ? "active incident" : "idle"}</span>
               <span>&middot;</span>
-              <span>3 patterns</span>
+              <span>{agentAnalysis?.referenced_memory_incidents.length ?? 0} refs</span>
             </div>
 
             <p className="mb-4 text-[12px] text-gray-500">Today&apos;s suggested prompts</p>
@@ -283,12 +292,15 @@ export function AgentChat({ activeIncident, injectedMessage, memoryMatches = [] 
                 {message.role === "assistant" && (
                   <div className="mb-1.5 flex flex-wrap items-center gap-2">
                     <span className="text-[11px] font-semibold text-teal-600">Kairo</span>
-                    {message.content.includes("MEMORY_REF") && (
+                    {(message.content.includes("MEMORY_REF") || message.analysis) && (
                       <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
-                        ⚡ Memory Active
+                        Memory Active
                       </span>
                     )}
                   </div>
+                )}
+                {message.role === "assistant" && message.analysis && (
+                  <StructuredReasoning analysis={message.analysis} />
                 )}
                 <div
                   className={cn(
@@ -336,6 +348,37 @@ export function AgentChat({ activeIncident, injectedMessage, memoryMatches = [] 
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function StructuredReasoning({ analysis }: { analysis: AgentReasoning }) {
+  return (
+    <div className="mb-2 w-full rounded-lg border border-teal-100 bg-teal-50/50 p-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-teal-700">
+        Structured Reasoning
+      </p>
+      <p className="mt-2 text-[12px] font-semibold leading-5 text-gray-900">
+        {analysis.diagnosis}
+      </p>
+      <p className="mt-2 text-[11px] leading-5 text-gray-600">
+        Cause: {analysis.likely_cause}
+      </p>
+      {analysis.recommended_next_actions.length > 0 && (
+        <div className="mt-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">
+            Next action
+          </p>
+          <p className="mt-1 text-[11px] leading-5 text-gray-700">
+            {analysis.recommended_next_actions[0]}
+          </p>
+        </div>
+      )}
+      {analysis.referenced_memory_incidents.length > 0 && (
+        <p className="mt-2 text-[10px] font-semibold text-teal-700">
+          {analysis.referenced_memory_incidents.length} memory references cited
+        </p>
+      )}
     </div>
   )
 }

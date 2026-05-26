@@ -10,11 +10,13 @@ import { MemoryLogPage } from "./pages/memory-log"
 import { PatternRulesPage } from "./pages/pattern-rules"
 import { Plus } from "lucide-react"
 import type { ApiIncident, DisplayIncident, LoadStatus, MemoryMatch } from "@/types/kairo"
+import type { AgentReasoning } from "@/types/agent"
 
 interface AgentMessage {
   id: string
   role: "assistant"
   content: string
+  analysis?: AgentReasoning
 }
 
 function mapSeverity(severity: string): DisplayIncident["severity"] {
@@ -37,6 +39,22 @@ function mapResolvedIncident(incident: ApiIncident): DisplayIncident {
   }
 }
 
+function vendorIdForName(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+}
+
+function buildIncidentDescription(incident: ApiIncident) {
+  return [
+    incident.vendor ?? "internal",
+    incident.region,
+    incident.title,
+    ...(incident.symptoms ?? []),
+    incident.customer_impact,
+  ]
+    .filter(Boolean)
+    .join(" ")
+}
+
 export function DashboardShell() {
   const [activePage, setActivePage] = useState("incidents")
   const [activeVendor, setActiveVendor] = useState<string | null>(null)
@@ -49,6 +67,8 @@ export function DashboardShell() {
   const [memoryMatches, setMemoryMatches] = useState<MemoryMatch[]>([])
   const [memoryStatus, setMemoryStatus] = useState<LoadStatus>("idle")
   const [reasoningStatus, setReasoningStatus] = useState<LoadStatus>("idle")
+  const [agentAnalysis, setAgentAnalysis] = useState<AgentReasoning | null>(null)
+  const [isResolving, setIsResolving] = useState(false)
 
   useEffect(() => {
     fetch("/api/incidents")
@@ -58,6 +78,76 @@ export function DashboardShell() {
       })
       .catch(console.error)
   }, [])
+
+  const allIncidents = [...activeIncidents, ...resolvedIncidents]
+  const vendorSummaries = Array.from(
+    allIncidents.reduce((vendors, incident) => {
+      const existing = vendors.get(incident.vendor) ?? {
+        id: vendorIdForName(incident.vendor),
+        name: incident.vendor,
+        incidentsLogged: 0,
+        patternsFound: 0,
+        recallAccuracy: 0,
+        status: "healthy" as "healthy" | "warning" | "critical",
+        lastIncident: "historical memory",
+      }
+      existing.incidentsLogged += 1
+      existing.patternsFound = new Set(
+        allIncidents
+          .filter((item) => item.vendor === incident.vendor)
+          .flatMap((item) => item.raw?.classification ? [item.raw.classification] : [])
+      ).size
+      existing.recallAccuracy = Math.min(96, 72 + existing.incidentsLogged * 3)
+      if (incident.status === "live" && incident.severity === "critical") existing.status = "critical"
+      else if (incident.status === "live" && existing.status !== "critical") existing.status = "warning"
+      if (incident.status === "live") existing.lastIncident = "active now"
+      vendors.set(incident.vendor, existing)
+      return vendors
+    }, new Map<string, {
+      id: string
+      name: string
+      incidentsLogged: number
+      patternsFound: number
+      recallAccuracy: number
+      status: "healthy" | "warning" | "critical"
+      lastIncident: string
+    }>())
+  ).map(([, vendor]) => vendor)
+
+  const memoryEntries = resolvedIncidents.slice(0, 20).map((incident) => ({
+    id: incident.id,
+    timestamp: incident.raw?.timestamp_start
+      ? new Date(incident.raw.timestamp_start).toLocaleString()
+      : incident.time,
+    vendor: incident.vendor,
+    incident: incident.name,
+    type: "resolution" as const,
+    retained:
+      incident.raw?.successful_fix ??
+      incident.raw?.actual_root_cause ??
+      incident.raw?.customer_impact ??
+      "Historical incident retained as memory",
+  }))
+
+  const patternRules = Array.from(
+    new Map(
+      resolvedIncidents.flatMap((incident) => {
+        const tags = [incident.classification, incident.raw?.vendor].filter(Boolean) as string[]
+        return tags.map((tag) => [
+          `${incident.vendor}:${tag}`,
+          {
+            id: `${vendorIdForName(incident.vendor)}-${tag}`,
+            name: `${incident.vendor} ${tag.replaceAll("_", " ")} pattern`,
+            vendor: incident.vendor,
+            confidence: Math.min(94, 70 + incident.memoryMatches * 5 + tags.length * 4),
+            triggerCount: resolvedIncidents.filter((item) => item.vendor === incident.vendor).length,
+            lastFired: incident.time,
+            condition: `${incident.vendor} + ${tag} + matching signals -> recall prior resolution and skipped checks`,
+          },
+        ])
+      })
+    ).values()
+  )
 
   const getPageTitle = () => {
     if (activeVendor) {
@@ -86,7 +176,7 @@ export function DashboardShell() {
 
   const renderPage = () => {
     if (activeVendor) {
-      return <VendorProfilePage vendorId={activeVendor} />
+      return <VendorProfilePage vendorId={activeVendor} incidents={allIncidents} />
     }
 
     const vendorPatternCount = new Set(
@@ -112,14 +202,17 @@ export function DashboardShell() {
             reasoningStatus={reasoningStatus}
             vendorPatternCount={vendorPatternCount}
             timeSavedMinutes={recalledMinutes}
+            onSelectIncident={handleSelectIncident}
+            onResolveIncident={handleResolveIncident}
+            resolvingIncidentId={isResolving ? activeIncident?.incident_id : null}
           />
         )
       case "vendors":
-        return <VendorsOverviewPage onVendorSelect={handleVendorSelect} />
+        return <VendorsOverviewPage onVendorSelect={handleVendorSelect} vendors={vendorSummaries} />
       case "memory":
-        return <MemoryLogPage />
+        return <MemoryLogPage entries={memoryEntries} />
       case "patterns":
-        return <PatternRulesPage />
+        return <PatternRulesPage patterns={patternRules} />
       default:
         return (
           <LiveIncidentsPage
@@ -131,8 +224,158 @@ export function DashboardShell() {
             reasoningStatus={reasoningStatus}
             vendorPatternCount={vendorPatternCount}
             timeSavedMinutes={recalledMinutes}
+            onSelectIncident={handleSelectIncident}
+            onResolveIncident={handleResolveIncident}
+            resolvingIncidentId={isResolving ? activeIncident?.incident_id : null}
           />
         )
+    }
+  }
+
+  const loadIncidentReasoning = async (incident: ApiIncident) => {
+    setActiveIncident(incident)
+    setMemoryStatus("loading")
+    setReasoningStatus("loading")
+    setMemoryMatches([])
+    setAgentAnalysis(null)
+
+    const memoryResponse = await fetch("/api/incidents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentIncident: incident }),
+    })
+    const memoryData = await memoryResponse.json()
+    if (!memoryResponse.ok) throw new Error(memoryData.error ?? "Failed to retrieve memory")
+
+    const matches = (memoryData.matches ?? []) as MemoryMatch[]
+    setMemoryMatches(matches)
+    setMemoryStatus("loaded")
+
+    const chatResponse = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        currentIncident: incident,
+        past_episodes: matches,
+        messages: [
+          {
+            role: "user",
+            content: `Analyze this active incident using memory: ${buildIncidentDescription(incident)}`,
+          },
+        ],
+      }),
+    })
+    const chatData = await chatResponse.json()
+    if (!chatResponse.ok) throw new Error(chatData.error ?? "Failed to load Kairo reasoning")
+
+    const chatMatches = (chatData.recalledIncidents ?? matches) as MemoryMatch[]
+    setMemoryMatches(chatMatches)
+    setReasoningStatus("loaded")
+    setAgentAnalysis(chatData.analysis ?? null)
+    setAgentMessage({
+      id: `analysis_${incident.incident_id}_${Date.now()}`,
+      role: "assistant",
+      content: chatData.response,
+      analysis: chatData.analysis,
+    })
+    setActiveIncidents((previous) =>
+      previous.map((item) =>
+        item.id === incident.incident_id
+          ? { ...item, memoryMatches: chatMatches.length }
+          : item
+      )
+    )
+  }
+
+  const handleSelectIncident = async (incident: DisplayIncident) => {
+    if (!incident.raw) return
+    try {
+      await loadIncidentReasoning(incident.raw)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to select incident"
+      setMemoryStatus("error")
+      setReasoningStatus("error")
+      setAgentMessage({
+        id: `select_error_${Date.now()}`,
+        role: "assistant",
+        content: `Selection failed: ${message}`,
+      })
+    }
+  }
+
+  const handleResolveIncident = async (incident: DisplayIncident) => {
+    if (!incident.raw || isResolving) return
+
+    const topMatch = memoryMatches[0]
+    const analysis = agentAnalysis
+    const fixApplied =
+      analysis?.recommended_next_actions?.[0] ??
+      topMatch?.resolution ??
+      topMatch?.metadata?.successful_fix ??
+      "Resolved using Kairo memory-guided mitigation"
+    const rootCause =
+      analysis?.likely_cause ??
+      topMatch?.root_cause ??
+      topMatch?.metadata?.actual_root_cause ??
+      "Resolved incident root cause recorded from Kairo operator flow"
+    const failedMitigations =
+      analysis?.checks_to_skip?.length
+        ? analysis.checks_to_skip
+        : topMatch?.skipped_checks ?? []
+    const patternTags =
+      topMatch?.patterns_matched?.length
+        ? topMatch.patterns_matched
+        : topMatch?.metadata?.patterns_matched?.split(",").map((item) => item.trim()).filter(Boolean) ?? []
+
+    setIsResolving(true)
+    try {
+      const response = await fetch("/api/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          incident: incident.raw,
+          fix_applied: fixApplied,
+          failed_mitigations: failedMitigations,
+          root_cause: rootCause,
+          pattern_tags: patternTags,
+          resolution_time_seconds: Number(topMatch?.metadata?.time_to_resolution_minutes ?? 20) * 60,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error ?? "Failed to resolve incident")
+
+      setActiveIncidents((previous) => previous.filter((item) => item.id !== incident.id))
+      setResolvedIncidents((previous) => [
+        {
+          ...incident,
+          status: "resolved",
+          severity: "info",
+          time: `Resolved now`,
+          raw: {
+            ...incident.raw!,
+            successful_fix: fixApplied,
+            actual_root_cause: rootCause,
+            failed_checks: failedMitigations,
+            time_to_resolution_minutes: Number(topMatch?.metadata?.time_to_resolution_minutes ?? 20),
+          },
+        },
+        ...previous,
+      ])
+      setActiveIncident(null)
+      setAgentMessage({
+        id: `resolved_${Date.now()}`,
+        role: "assistant",
+        content: `WRITE_BACK_COMPLETE: ${incident.name}\nStored resolution as retrievable Kairo memory via /api/resolve.\nResolution: ${fixApplied}`,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to resolve incident"
+      setAgentMessage({
+        id: `resolve_error_${Date.now()}`,
+        role: "assistant",
+        content: `Resolution write-back failed: ${message}`,
+      })
+    } finally {
+      setIsResolving(false)
     }
   }
 
@@ -230,10 +473,12 @@ export function DashboardShell() {
       }
 
       setReasoningStatus("loaded")
+      setAgentAnalysis(chatData.analysis ?? data.structuredAnalysis ?? null)
       setAgentMessage({
         id: `sim_${Date.now()}`,
         role: "assistant",
         content: chatData.response ?? data.analysis,
+        analysis: chatData.analysis ?? data.structuredAnalysis,
       })
       setSimulationCounter((previous) => previous + 1)
     } catch (error) {
@@ -289,6 +534,7 @@ export function DashboardShell() {
         memoryMatches={memoryMatches}
         memoryStatus={memoryStatus}
         reasoningStatus={reasoningStatus}
+        agentAnalysis={agentAnalysis}
       />
     </div>
   )

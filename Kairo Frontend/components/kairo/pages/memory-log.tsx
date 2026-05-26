@@ -13,98 +13,15 @@ interface MemoryEntry {
   retained: string
 }
 
-const memoryEntries: MemoryEntry[] = [
-  {
-    id: "1",
-    timestamp: "Apr 11, 2026 09:42",
-    vendor: "Stripe",
-    incident: "Payment gateway timeout — EU-West",
-    type: "anomaly",
-    retained: "Status page green but 504s persisted for 12 min",
-  },
-  {
-    id: "2",
-    timestamp: "Apr 11, 2026 09:18",
-    vendor: "Twilio",
-    incident: "SMS delivery drop — Southeast Asia",
-    type: "context",
-    retained: "Carrier-level issue affecting multiple APAC providers",
-  },
-  {
-    id: "3",
-    timestamp: "Apr 11, 2026 05:23",
-    vendor: "AWS S3",
-    incident: "Latency spike — us-east-1",
-    type: "pattern",
-    retained: "Morning spike 9-11 AM EST, auto-resolves",
-  },
-  {
-    id: "4",
-    timestamp: "Apr 10, 2026 18:45",
-    vendor: "SendGrid",
-    incident: "Email delivery delay — North America",
-    type: "resolution",
-    retained: "ISP throttling resolved by staggering sends",
-  },
-  {
-    id: "5",
-    timestamp: "Apr 10, 2026 14:12",
-    vendor: "Stripe",
-    incident: "Webhook retry storm",
-    type: "resolution",
-    retained: "Exponential backoff with 15 min recovery",
-  },
-  {
-    id: "6",
-    timestamp: "Apr 9, 2026 22:33",
-    vendor: "Twilio",
-    incident: "Voice API latency spike",
-    type: "pattern",
-    retained: "Cold start latency common after idle periods",
-  },
-  {
-    id: "7",
-    timestamp: "Apr 8, 2026 11:05",
-    vendor: "AWS S3",
-    incident: "Bucket access timeout",
-    type: "resolution",
-    retained: "Retry with exponential backoff effective",
-  },
-  {
-    id: "8",
-    timestamp: "Apr 7, 2026 16:28",
-    vendor: "SendGrid",
-    incident: "Template rendering timeout",
-    type: "resolution",
-    retained: "Template simplification reduced render by 60%",
-  },
-  {
-    id: "9",
-    timestamp: "Apr 6, 2026 08:15",
-    vendor: "Stripe",
-    incident: "API rate limit spike",
-    type: "context",
-    retained: "High traffic during flash sale exceeded limits",
-  },
-  {
-    id: "10",
-    timestamp: "Apr 5, 2026 20:42",
-    vendor: "Twilio",
-    incident: "Number provisioning delay",
-    type: "anomaly",
-    retained: "Regulatory approval backlog in EU region",
-  },
-]
-
-const vendors = ["All vendors", "Stripe", "Twilio", "AWS S3", "SendGrid"]
 const types = ["All types", "pattern", "resolution", "anomaly", "context"]
 
-export function MemoryLogPage() {
+export function MemoryLogPage({ entries }: { entries: MemoryEntry[] }) {
   const [selectedVendor, setSelectedVendor] = useState("All vendors")
   const [selectedType, setSelectedType] = useState("All types")
   const [searchQuery, setSearchQuery] = useState("")
+  const vendors = ["All vendors", ...Array.from(new Set(entries.map((entry) => entry.vendor)))]
 
-  const filteredEntries = memoryEntries.filter((entry) => {
+  const filteredEntries = entries.filter((entry) => {
     const matchesVendor = selectedVendor === "All vendors" || entry.vendor === selectedVendor
     const matchesType = selectedType === "All types" || entry.type === selectedType
     const matchesSearch =

@@ -2,6 +2,7 @@
 
 import { AgentChat } from "./agent-chat"
 import type { ApiIncident, LoadStatus, MemoryMatch } from "@/types/kairo"
+import type { AgentReasoning } from "@/types/agent"
 
 interface RightPanelProps {
   activeIncident: ApiIncident | null
@@ -9,10 +10,12 @@ interface RightPanelProps {
     id: string
     role: "assistant"
     content: string
+    analysis?: AgentReasoning
   } | null
   memoryMatches: MemoryMatch[]
   memoryStatus: LoadStatus
   reasoningStatus: LoadStatus
+  agentAnalysis: AgentReasoning | null
 }
 
 export function RightPanel({
@@ -21,6 +24,7 @@ export function RightPanel({
   memoryMatches,
   memoryStatus,
   reasoningStatus,
+  agentAnalysis,
 }: RightPanelProps) {
   return (
     <div className="hidden h-full w-[340px] min-w-[340px] flex-col border-l border-gray-100 bg-white xl:flex">
@@ -77,16 +81,21 @@ export function RightPanel({
                     </span>
                   </div>
                   <p className="line-clamp-2 text-[12px] font-semibold leading-5 text-gray-900">
-                    {meta.title ?? match.text ?? "Prior incident"}
+                    {match.title ?? meta.title ?? match.text ?? "Prior incident"}
                   </p>
-                  {meta.successful_fix && (
+                  {(match.resolution ?? meta.successful_fix) && (
                     <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-gray-600">
-                      Fix: {meta.successful_fix}
+                      Fix: {match.resolution ?? meta.successful_fix}
                     </p>
                   )}
-                  {meta.failed_checks && (
+                  {(match.skipped_checks?.length || meta.failed_checks) && (
                     <p className="mt-1 line-clamp-1 text-[11px] leading-5 text-gray-400">
-                      Skip: {meta.failed_checks}
+                      Skip: {match.skipped_checks?.join(", ") ?? meta.failed_checks}
+                    </p>
+                  )}
+                  {typeof match.similarity === "number" && (
+                    <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400">
+                      {Math.round(match.similarity * 100)}% similar
                     </p>
                   )}
                 </div>
@@ -100,6 +109,7 @@ export function RightPanel({
           activeIncident={activeIncident}
           injectedMessage={injectedMessage}
           memoryMatches={memoryMatches}
+          agentAnalysis={agentAnalysis}
         />
       </div>
     </div>

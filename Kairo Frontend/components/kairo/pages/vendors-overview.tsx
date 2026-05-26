@@ -1,6 +1,6 @@
 "use client"
 
-import { ExternalLink, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react"
+import { ExternalLink, AlertTriangle, CheckCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { VendorLogo } from "../vendor-logo"
 
@@ -8,83 +8,46 @@ interface VendorSummary {
   id: string
   name: string
   incidentsLogged: number
-  memoryMonths: number
   patternsFound: number
   recallAccuracy: number
   status: "healthy" | "warning" | "critical"
   lastIncident: string
 }
 
-const vendors: VendorSummary[] = [
-  {
-    id: "razorpay",
-    name: "Razorpay",
-    incidentsLogged: 14,
-    memoryMonths: 8,
-    patternsFound: 3,
-    recallAccuracy: 89,
-    status: "critical",
-    lastIncident: "2 min ago",
-  },
-  {
-    id: "msg91",
-    name: "MSG91",
-    incidentsLogged: 8,
-    memoryMonths: 6,
-    patternsFound: 2,
-    recallAccuracy: 82,
-    status: "warning",
-    lastIncident: "18 min ago",
-  },
-  {
-    id: "aws-s3",
-    name: "AWS S3",
-    incidentsLogged: 6,
-    memoryMonths: 10,
-    patternsFound: 2,
-    recallAccuracy: 94,
-    status: "healthy",
-    lastIncident: "4 hours ago",
-  },
-  {
-    id: "cashfree",
-    name: "Cashfree",
-    incidentsLogged: 5,
-    memoryMonths: 4,
-    patternsFound: 1,
-    recallAccuracy: 75,
-    status: "healthy",
-    lastIncident: "6 hours ago",
-  },
-]
-
 interface VendorsOverviewPageProps {
   onVendorSelect: (vendorId: string) => void
+  vendors: VendorSummary[]
 }
 
-export function VendorsOverviewPage({ onVendorSelect }: VendorsOverviewPageProps) {
+export function VendorsOverviewPage({ onVendorSelect, vendors }: VendorsOverviewPageProps) {
+  const totalPatterns = vendors.reduce((total, vendor) => total + vendor.patternsFound, 0)
+  const totalIncidents = vendors.reduce((total, vendor) => total + vendor.incidentsLogged, 0)
+  const avgRecall = vendors.length
+    ? Math.round(vendors.reduce((total, vendor) => total + vendor.recallAccuracy, 0) / vendors.length)
+    : 0
+
   return (
     <div className="flex-1 overflow-y-auto bg-white px-8 py-8">
       {/* Stats Summary */}
       <div className="mb-10 grid grid-cols-4 gap-8">
         <SummaryCard
           label="Total Vendors"
-          value="4"
+          value={String(vendors.length)}
           subtitle="being monitored"
         />
         <SummaryCard
           label="Total Incidents"
-          value="33"
+          value={String(totalIncidents)}
           subtitle="logged across all vendors"
         />
         <SummaryCard
           label="Patterns Detected"
-          value="8"
+          value={String(totalPatterns)}
           subtitle="failure patterns identified"
         />
         <SummaryCard
           label="Avg Recall Accuracy"
-          value="85%"
+          value={`${avgRecall}%`}
           subtitle="across all vendors"
           highlight
         />
@@ -174,7 +137,7 @@ function VendorCard({
 
       {/* Stats */}
       <div className="mb-5 flex items-center gap-4">
-        <StatPill label={`${vendor.memoryMonths} mo memory`} />
+        <StatPill label={`${vendor.incidentsLogged} memories`} />
         <StatPill label={`${vendor.patternsFound} patterns`} />
         <StatPill label={`${vendor.recallAccuracy}% accuracy`} highlight />
       </div>

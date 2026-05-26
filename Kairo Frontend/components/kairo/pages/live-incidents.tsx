@@ -14,6 +14,9 @@ export function LiveIncidentsPage({
   reasoningStatus,
   vendorPatternCount,
   timeSavedMinutes,
+  onSelectIncident,
+  onResolveIncident,
+  resolvingIncidentId,
 }: {
   activeIncidents: DisplayIncident[]
   resolvedIncidents: DisplayIncident[]
@@ -23,6 +26,9 @@ export function LiveIncidentsPage({
   reasoningStatus: LoadStatus
   vendorPatternCount: number
   timeSavedMinutes: number
+  onSelectIncident: (incident: DisplayIncident) => void
+  onResolveIncident: (incident: DisplayIncident) => void
+  resolvingIncidentId: string | null | undefined
 }) {
   const memoryHits = memoryMatches.length
   const timeSavedLabel = timeSavedMinutes > 0 ? `${timeSavedMinutes}m` : "0m"
@@ -78,7 +84,13 @@ export function LiveIncidentsPage({
 
       {/* Incident Tables */}
       <div className="flex-1">
-        <IncidentTable incidents={activeIncidents} memoryStatus={memoryStatus} />
+        <IncidentTable
+          incidents={activeIncidents}
+          memoryStatus={memoryStatus}
+          onSelectIncident={onSelectIncident}
+          onResolveIncident={onResolveIncident}
+          resolvingIncidentId={resolvingIncidentId}
+        />
         
         {/* Resolved divider */}
         <div className="flex items-center gap-3 border-t border-gray-100 px-8 py-6">
@@ -86,7 +98,13 @@ export function LiveIncidentsPage({
           <div className="flex-1 h-px bg-gray-100" />
         </div>
         
-        <IncidentTable incidents={resolvedIncidents} isResolved />
+        <IncidentTable
+          incidents={resolvedIncidents}
+          isResolved
+          onSelectIncident={onSelectIncident}
+          onResolveIncident={onResolveIncident}
+          resolvingIncidentId={resolvingIncidentId}
+        />
       </div>
     </div>
   )
@@ -119,10 +137,16 @@ function IncidentTable({
   incidents,
   isResolved = false,
   memoryStatus,
+  onSelectIncident,
+  onResolveIncident,
+  resolvingIncidentId,
 }: {
   incidents: DisplayIncident[]
   isResolved?: boolean
   memoryStatus?: LoadStatus
+  onSelectIncident: (incident: DisplayIncident) => void
+  onResolveIncident: (incident: DisplayIncident) => void
+  resolvingIncidentId?: string | null
 }) {
   return (
     <div className={cn("bg-white", isResolved && "opacity-70")}>
@@ -130,8 +154,9 @@ function IncidentTable({
       {incidents.map((incident) => (
         <div
           key={incident.id}
+          onClick={() => onSelectIncident(incident)}
           className={cn(
-            "grid min-h-[72px] grid-cols-[28px_minmax(260px,1fr)_136px_112px_130px_126px_32px] items-center gap-4 border-b border-gray-100 px-8 py-4 transition-colors",
+            "grid min-h-[72px] cursor-pointer grid-cols-[28px_minmax(260px,1fr)_136px_112px_130px_126px_76px] items-center gap-4 border-b border-gray-100 px-8 py-4 transition-colors",
             incident.status === "live" && incident.severity === "critical" && "border-l-4 border-l-[#EE4444] hover:bg-[#FAFAFA]",
             incident.status === "live" && incident.severity === "warning" && "border-l-4 border-l-[#F59E0B] hover:bg-[#FAFAFA]",
             incident.status === "resolved" && "hover:bg-[#FAFAFA]"
@@ -199,8 +224,25 @@ function IncidentTable({
 
           {/* Actions */}
           <div className="flex justify-center">
-            <button className="flex h-7 w-7 items-center justify-center rounded transition-colors text-gray-400 hover:bg-gray-100 hover:text-gray-900">
-              <MoreHorizontal className="h-4 w-4" />
+            <button
+              onClick={(event) => {
+                event.stopPropagation()
+                if (incident.status === "live") onResolveIncident(incident)
+              }}
+              disabled={incident.status !== "live" || resolvingIncidentId === incident.id}
+              className={cn(
+                "flex h-7 min-w-[68px] items-center justify-center rounded border px-2 text-[11px] font-semibold transition-colors",
+                incident.status === "live"
+                  ? "border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                  : "border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-900",
+                resolvingIncidentId === incident.id && "cursor-not-allowed opacity-60"
+              )}
+            >
+              {incident.status === "live"
+                ? resolvingIncidentId === incident.id
+                  ? "Saving"
+                  : "Resolve"
+                : <MoreHorizontal className="h-4 w-4" />}
             </button>
           </div>
         </div>

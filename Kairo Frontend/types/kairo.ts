@@ -9,6 +9,14 @@ export interface ApiIncident {
   customer_impact?: string
   time_to_resolution_minutes?: number
   classification?: string
+  service?: string
+  description?: string
+  environment?: string
+  timestamp_end?: string | null
+  successful_fix?: string
+  actual_root_cause?: string
+  failed_checks?: string[]
+  tags?: string[]
 }
 
 export interface DisplayIncident {

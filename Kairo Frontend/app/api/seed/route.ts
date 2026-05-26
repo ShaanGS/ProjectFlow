@@ -1,20 +1,11 @@
 import { NextResponse } from "next/server"
-import incidents from "@/data/incidents.json"
-import { retainIncident } from "@/lib/hindsight"
+import { canonicalIncidentSeed } from "@/lib/db/incidents"
 
 export async function POST() {
-  try {
-    for (const incident of incidents) {
-      await retainIncident(incident)
-      await new Promise((resolve) => setTimeout(resolve, 300))
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Seeded ${incidents.length} incidents to Hindsight`,
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to seed incidents"
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
+  return NextResponse.json({
+    success: true,
+    source: "data/incidents-seed.json",
+    incidents: canonicalIncidentSeed.length,
+    message: `Canonical Kairo memory dataset is available with ${canonicalIncidentSeed.length} incidents.`,
+  })
 }
