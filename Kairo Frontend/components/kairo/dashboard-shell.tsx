@@ -3,20 +3,22 @@
 import { useEffect, useState } from "react"
 import { LeftNav } from "./left-nav"
 import { RightPanel } from "./right-panel"
+import { KairoConsole } from "./kairo-console"
 import { LiveIncidentsPage } from "./pages/live-incidents"
 import { VendorProfilePage } from "./pages/vendor-profile"
 import { VendorsOverviewPage } from "./pages/vendors-overview"
 import { MemoryLogPage } from "./pages/memory-log"
 import { PatternRulesPage } from "./pages/pattern-rules"
-import { Plus } from "lucide-react"
+import { Brain, Plus } from "lucide-react"
 import type { ApiIncident, DisplayIncident, LoadStatus, MemoryMatch } from "@/types/kairo"
-import type { AgentReasoning } from "@/types/agent"
+import type { AgentReasoning, AgentRuntimeResponse } from "@/types/agent"
 
 interface AgentMessage {
   id: string
   role: "assistant"
   content: string
   analysis?: AgentReasoning
+  stages?: AgentRuntimeResponse["stages"]
 }
 
 type ApiEnvelope<T> =
@@ -77,11 +79,13 @@ export function DashboardShell() {
   const [memoryStatus, setMemoryStatus] = useState<LoadStatus>("idle")
   const [reasoningStatus, setReasoningStatus] = useState<LoadStatus>("idle")
   const [agentAnalysis, setAgentAnalysis] = useState<AgentReasoning | null>(null)
+  const [agentStages, setAgentStages] = useState<AgentRuntimeResponse["stages"]>([])
   const [isResolving, setIsResolving] = useState(false)
   const [incidentListStatus, setIncidentListStatus] = useState<LoadStatus>("loading")
   const [incidentListError, setIncidentListError] = useState<string | null>(null)
   const [flowError, setFlowError] = useState<string | null>(null)
   const [agentThreadKey, setAgentThreadKey] = useState(0)
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false)
 
   useEffect(() => {
     fetch("/api/incidents")
@@ -262,6 +266,7 @@ export function DashboardShell() {
     setReasoningStatus("loading")
     setMemoryMatches([])
     setAgentAnalysis(null)
+    setAgentStages([])
     setFlowError(null)
     setAgentThreadKey((previous) => previous + 1)
 
@@ -304,11 +309,13 @@ export function DashboardShell() {
     setMemoryMatches(chatMatches)
     setReasoningStatus("loaded")
     setAgentAnalysis(chatData.analysis ?? null)
+    setAgentStages(chatData.stages ?? [])
     setAgentMessage({
       id: `analysis_${incident.incident_id}_${Date.now()}`,
       role: "assistant",
       content: chatData.response,
       analysis: chatData.analysis,
+      stages: chatData.stages,
     })
     setActiveIncidents((previous) =>
       previous.map((item) =>
@@ -399,6 +406,7 @@ export function DashboardShell() {
         id: `resolved_${Date.now()}`,
         role: "assistant",
         content: `WRITE_BACK_COMPLETE: ${incident.name}\nStored resolution as retrievable Kairo memory via /api/resolve.\nResolution: ${fixApplied}`,
+        analysis: analysis ?? undefined,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to resolve incident"
@@ -423,6 +431,7 @@ export function DashboardShell() {
     setReasoningStatus("loading")
     setMemoryMatches([])
     setAgentAnalysis(null)
+    setAgentStages([])
     setFlowError(null)
     setAgentThreadKey((previous) => previous + 1)
 
@@ -469,7 +478,7 @@ export function DashboardShell() {
           classification: data.classification,
           raw: incident,
         },
-        ...previous,
+        ...previous.filter((item) => item.id !== incident.incident_id),
       ])
 
       // Populate Episodic Memory panel immediately from alert recall
@@ -513,11 +522,13 @@ export function DashboardShell() {
 
       setReasoningStatus("loaded")
       setAgentAnalysis(chatData.analysis ?? data.structuredAnalysis ?? null)
+      setAgentStages(chatData.stages ?? [])
       setAgentMessage({
         id: `sim_${Date.now()}`,
         role: "assistant",
         content: chatData.response ?? data.analysis,
         analysis: chatData.analysis ?? data.structuredAnalysis,
+        stages: chatData.stages,
       })
       setSimulationCounter((previous) => previous + 1)
     } catch (error) {
@@ -547,18 +558,28 @@ export function DashboardShell() {
       />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Bar */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-8">
           <h1 className="text-xl font-semibold tracking-tight text-gray-900">{getPageTitle()}</h1>
-          <button
-            onClick={handleSimulateIncident}
-            disabled={isSimulating}
-            className="flex items-center gap-2 rounded-full bg-gray-900 px-6 py-2.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
-          >
-            <Plus className="h-4 w-4" />
-            {isSimulating ? "Simulating..." : "Simulate Incident"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsConsoleOpen(true)}
+              className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-800 shadow-sm transition-all hover:border-teal-200 hover:bg-teal-50"
+            >
+              <Brain className="h-4 w-4 text-teal-700" />
+              Ask Kairo
+            </button>
+            <button
+              onClick={handleSimulateIncident}
+              disabled={isSimulating}
+              className="flex items-center gap-2 rounded-full bg-gray-900 px-6 py-2.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+            >
+              <Plus className="h-4 w-4" />
+              {isSimulating ? "Simulating..." : "Simulate Incident"}
+            </button>
+          </div>
         </header>
 
         {/* Page Content */}
@@ -567,14 +588,26 @@ export function DashboardShell() {
         </main>
       </div>
 
-      {/* Right Panel - Agent Chat */}
+      {/* Right Intelligence Rail */}
       <RightPanel
+        activeIncident={activeIncident}
+        memoryMatches={memoryMatches}
+        memoryStatus={memoryStatus}
+        reasoningStatus={reasoningStatus}
+        agentAnalysis={agentAnalysis}
+        onOpenConsole={() => setIsConsoleOpen(true)}
+      />
+
+      <KairoConsole
+        isOpen={isConsoleOpen}
+        onClose={() => setIsConsoleOpen(false)}
         activeIncident={activeIncident}
         injectedMessage={agentMessage}
         memoryMatches={memoryMatches}
         memoryStatus={memoryStatus}
         reasoningStatus={reasoningStatus}
         agentAnalysis={agentAnalysis}
+        agentStages={agentStages}
         agentThreadKey={agentThreadKey}
       />
     </div>

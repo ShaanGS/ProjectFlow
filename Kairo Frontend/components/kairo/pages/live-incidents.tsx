@@ -38,11 +38,12 @@ export function LiveIncidentsPage({
 }) {
   const memoryHits = memoryMatches.length
   const timeSavedLabel = timeSavedMinutes > 0 ? `${timeSavedMinutes}m` : "0m"
+  const activePriority = getPriorityFromSeverity(activeIncident?.severity)
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white">
+    <div className="min-w-0 flex-1 overflow-y-auto bg-white">
       {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-8 border-b border-gray-100 bg-white px-8 py-8">
+      <div className="grid grid-cols-3 gap-4 border-b border-gray-100 bg-white px-6 py-5">
         <StatBlock
           label="MEMORY RECALL HITS"
           value={memoryStatus === "loading" ? "…" : String(memoryHits)}
@@ -61,7 +62,7 @@ export function LiveIncidentsPage({
       </div>
 
       {activeIncident && (
-        <div className="border-b border-gray-100 bg-[#FAFAFA] px-8 py-5">
+        <div className="border-b border-gray-100 bg-[#FAFAFA] px-6 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">
@@ -77,6 +78,7 @@ export function LiveIncidentsPage({
               )}
             </div>
             <div className="flex items-center gap-2">
+              <PriorityBadge priority={activePriority} />
               <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-gray-600">
                 {activeIncident.vendor ?? "Internal"}
               </span>
@@ -89,7 +91,7 @@ export function LiveIncidentsPage({
       )}
 
       {flowError && (
-        <div className="border-b border-red-100 bg-red-50 px-8 py-3 text-[12px] font-semibold text-red-700">
+        <div className="border-b border-red-100 bg-red-50 px-6 py-3 text-[12px] font-semibold text-red-700">
           {flowError}
         </div>
       )}
@@ -105,7 +107,7 @@ export function LiveIncidentsPage({
         />
         
         {/* Resolved divider */}
-        <div className="flex items-center gap-3 border-t border-gray-100 px-8 py-6">
+        <div className="flex items-center gap-3 border-t border-gray-100 px-6 py-6">
           <span className="text-[11px] text-gray-500">resolved</span>
           <div className="flex-1 h-px bg-gray-100" />
         </div>
@@ -134,16 +136,56 @@ function StatBlock({
   subtitle: string
 }) {
   return (
-    <div className="rounded-lg border border-gray-100 bg-white p-8 shadow-sm">
-      <p className="min-h-[32px] text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+    <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
+      <p className="min-h-[30px] text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
         {label}
       </p>
-      <div className="mt-4 flex flex-col">
-        <p className="text-[38px] font-bold leading-none tracking-[-0.04em] text-gray-900">{value}</p>
-        <div className="mt-4 h-0.5 w-8 bg-teal-600" />
+      <div className="mt-3 flex flex-col">
+        <p className="text-[32px] font-bold leading-none tracking-[-0.04em] text-gray-900">{value}</p>
+        <div className="mt-3 h-0.5 w-8 bg-teal-600" />
       </div>
-      <p className="mt-4 text-[12px] font-medium text-gray-500">{subtitle}</p>
+      <p className="mt-3 text-[12px] font-medium text-gray-500">{subtitle}</p>
     </div>
+  )
+}
+
+type IncidentPriority = "P0" | "P1" | "P2" | "P3"
+
+function getPriorityFromSeverity(severity?: string): IncidentPriority {
+  if (severity === "SEV-1" || severity === "critical") return "P0"
+  if (severity === "SEV-2" || severity === "warning") return "P1"
+  if (severity === "SEV-3") return "P2"
+  return "P3"
+}
+
+function getPriorityForDisplayIncident(incident: DisplayIncident): IncidentPriority {
+  return getPriorityFromSeverity(incident.raw?.severity ?? incident.severity)
+}
+
+function PriorityBadge({
+  priority,
+  compact = false,
+}: {
+  priority: IncidentPriority
+  compact?: boolean
+}) {
+  const classes: Record<IncidentPriority, string> = {
+    P0: "border-red-100 bg-red-50 text-red-700",
+    P1: "border-amber-100 bg-amber-50 text-amber-700",
+    P2: "border-blue-100 bg-blue-50 text-blue-700",
+    P3: "border-gray-100 bg-gray-50 text-gray-600",
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center justify-center rounded-full border font-bold uppercase tracking-[0.08em]",
+        compact ? "min-w-10 px-2 py-1 text-[10px]" : "px-3 py-1.5 text-[11px]",
+        classes[priority]
+      )}
+    >
+      {priority}
+    </span>
   )
 }
 
@@ -169,24 +211,24 @@ function IncidentTable({
   return (
     <div className={cn("bg-white", isResolved && "opacity-70")}>
       {isResolved && listStatus === "loading" && (
-        <div className="space-y-3 px-8 py-4">
+        <div className="space-y-3 px-6 py-4">
           {[0, 1, 2].map((item) => (
             <div key={item} className="h-[54px] rounded-lg border border-gray-100 bg-gray-50" />
           ))}
         </div>
       )}
       {isResolved && listStatus === "error" && (
-        <div className="px-8 py-5 text-[13px] font-medium text-red-700">
+        <div className="px-6 py-5 text-[13px] font-medium text-red-700">
           {listError ?? "retrieval failed while loading incidents"}
         </div>
       )}
       {/* Rows */}
-      {listStatus !== "error" && incidents.map((incident) => (
+      {listStatus !== "error" && incidents.map((incident, index) => (
         <div
-          key={incident.id}
+          key={`${isResolved ? "resolved" : "active"}-${incident.id}-${index}`}
           onClick={() => onSelectIncident(incident)}
           className={cn(
-            "grid min-h-[72px] cursor-pointer grid-cols-[28px_minmax(260px,1fr)_136px_112px_130px_126px_76px] items-center gap-4 border-b border-gray-100 px-8 py-4 transition-colors",
+            "grid min-h-[72px] cursor-pointer grid-cols-[18px_minmax(160px,1fr)_44px_104px_76px_72px_86px_56px] items-center gap-2 border-b border-gray-100 px-6 py-4 transition-colors",
             incident.status === "live" && incident.severity === "critical" && "border-l-4 border-l-[#EE4444] hover:bg-[#FAFAFA]",
             incident.status === "live" && incident.severity === "warning" && "border-l-4 border-l-[#F59E0B] hover:bg-[#FAFAFA]",
             incident.status === "resolved" && "hover:bg-[#FAFAFA]"
@@ -207,6 +249,11 @@ function IncidentTable({
           {/* Name */}
           <div className="truncate text-[13px] font-semibold text-gray-900">
             {incident.name}
+          </div>
+
+          {/* Priority */}
+          <div>
+            <PriorityBadge priority={getPriorityForDisplayIncident(incident)} compact />
           </div>
 
           {/* Vendor */}
@@ -232,13 +279,13 @@ function IncidentTable({
           </div>
 
           {/* Time */}
-          <div className="truncate text-[12px] font-medium text-gray-500">{incident.time}</div>
+          <div className="truncate text-[11px] font-medium text-gray-500">{incident.time}</div>
 
           {/* Memory Matches */}
           <div>
             <span
               className={cn(
-                "inline-flex min-w-[106px] justify-center rounded-md border px-3 py-1.5 text-[11px] font-bold",
+                "inline-flex min-w-[82px] justify-center rounded-md border px-2 py-1.5 text-[10px] font-bold",
                 incident.status === "live" && memoryStatus === "loading"
                   ? "border-gray-200 bg-gray-50 text-gray-400"
                   : incident.memoryMatches > 0
@@ -261,7 +308,7 @@ function IncidentTable({
               }}
               disabled={incident.status !== "live" || resolvingIncidentId === incident.id}
               className={cn(
-                "flex h-7 min-w-[68px] items-center justify-center rounded border px-2 text-[11px] font-semibold transition-colors",
+                "flex h-7 min-w-[54px] items-center justify-center rounded border px-2 text-[10px] font-semibold transition-colors",
                 incident.status === "live"
                   ? "border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100"
                   : "border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-900",
