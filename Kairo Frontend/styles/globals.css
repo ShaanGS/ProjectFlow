@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -75,7 +76,7 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
+  --font-sans: 'Inter', 'Inter Fallback', sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -121,5 +122,23 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', 'Inter Fallback', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
   }
+}
+
+@keyframes kairo-stage-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kairo-stage-in {
+  animation: kairo-stage-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

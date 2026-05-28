@@ -283,15 +283,15 @@ export function AgentChat({
   return (
     <div className="flex h-full flex-col bg-white font-sans antialiased">
       {/* Header */}
-      <div className="border-b border-gray-100 bg-[#FAFAFA] px-6 py-4">
+      <div className="border-b border-gray-100 bg-[#FAFAFA] px-7 py-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <img src="/icon.svg" alt="Kairo Icon" className="h-8 w-8 shrink-0 object-contain" />
             <div className="min-w-0">
-              <h3 className="text-[16px] font-bold leading-tight tracking-[-0.02em] text-gray-900">
+              <h3 className="text-[20px] font-bold leading-tight tracking-tight text-gray-900">
                 Kairo Agent
               </h3>
-              <p className="text-[12px] text-gray-500">memory copilot</p>
+              <p className="text-[13px] leading-5 text-gray-500">memory copilot</p>
             </div>
           </div>
           <div
@@ -312,7 +312,7 @@ export function AgentChat({
               }
               className={cn(
                 "group inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2.5 sm:w-auto sm:min-w-[10.5rem]",
-                "text-[12px] font-semibold tracking-[-0.01em] text-gray-900 shadow-sm",
+                "text-[13px] font-semibold tracking-[-0.01em] text-gray-900 shadow-sm",
                 "transition-all duration-200",
                 "hover:border-teal-200 hover:bg-teal-50 hover:shadow-md",
                 "active:scale-[0.99]",
@@ -340,7 +340,7 @@ export function AgentChat({
               <img src="/kairo-logo.png" alt="Kairo" className="w-36 h-auto object-contain" />
             </div>
 
-            <p className="mb-8 max-w-[220px] text-center text-[13px] text-gray-500">
+            <p className="mb-8 max-w-[280px] text-center text-[15px] leading-6 text-gray-500">
               {reasoningStatus === "loading"
                 ? "Analyzing retrieved incident memory..."
                 : reasoningStatus === "error"
@@ -349,7 +349,7 @@ export function AgentChat({
             </p>
 
             {/* Metrics Row */}
-            <div className="mb-8 flex items-center justify-center gap-1.5 text-[11px] text-[#6b7280]">
+            <div className="mb-8 flex items-center justify-center gap-1.5 text-[12px] text-[#6b7280]">
               <span>{memoryMatches.length} memories</span>
               <span>&middot;</span>
               <span>{activeIncident ? "active incident" : "idle"}</span>
@@ -357,7 +357,7 @@ export function AgentChat({
               <span>{agentAnalysis?.referenced_memory_incidents.length ?? 0} refs</span>
             </div>
 
-            <p className="mb-4 text-[12px] text-gray-500">Today&apos;s suggested prompts</p>
+            <p className="mb-4 text-[13px] text-gray-500">Today&apos;s suggested prompts</p>
 
             {/* Suggestion Cards */}
             <div className="flex flex-col gap-3 w-full px-3">
@@ -367,17 +367,17 @@ export function AgentChat({
                   <button
                     key={index}
                     onClick={() => handleSuggestionClick(card.text)}
-                    className="flex items-start gap-3 rounded-lg border border-gray-100 bg-white p-4 text-left transition-all hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm"
+                    className="flex items-start gap-3 rounded-lg border border-gray-100 bg-white p-5 text-left transition-all hover:bg-gray-50 hover:border-gray-200 hover:shadow-sm"
                   >
                     <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" strokeWidth={1.5} />
-                    <span className="text-[13px] text-gray-900 leading-snug">{card.text}</span>
+                    <span className="text-[15px] leading-6 text-gray-900">{card.text}</span>
                   </button>
                 )
               })}
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 px-6 py-5">
+          <div className="flex flex-col gap-5 px-7 py-6">
             {(agentStages.length > 0 || messages.some((message) => message.analysis)) && (
               <ReasoningStages
                 status={reasoningStatus === "idle" ? "loaded" : reasoningStatus}
@@ -394,7 +394,7 @@ export function AgentChat({
               >
                 {message.role === "assistant" && (
                   <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-semibold text-teal-600">Kairo</span>
+                    <span className="text-[12px] font-semibold text-teal-600">Kairo</span>
                     {message.analysis && (
                       <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
                         Memory Active
@@ -408,7 +408,7 @@ export function AgentChat({
                 {!message.analysis && (
                   <div
                     className={cn(
-                      "whitespace-pre-wrap px-4 py-3 text-[13px] leading-6 shadow-sm",
+                      "whitespace-pre-wrap px-5 py-4 text-[15px] leading-7 shadow-sm",
                       message.role === "user"
                         ? "max-w-[82%] rounded-[18px_18px_4px_18px] border border-gray-800 bg-gray-900 text-white"
                         : "w-full rounded-lg border border-gray-100 bg-white text-gray-900"
@@ -425,10 +425,10 @@ export function AgentChat({
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-100 bg-white p-4">
+      <div className="border-t border-gray-100 bg-white p-5">
         {/* Model Selector */}
         <div className="mb-4 flex items-center">
-          <button className="flex items-center gap-1.5 text-[12px] text-gray-500 hover:text-gray-900">
+          <button className="flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-gray-900">
             <Zap className="h-3.5 w-3.5" />
             <span>Groq · qwen3</span>
             <ChevronDown className="h-3 w-3" />
@@ -442,7 +442,7 @@ export function AgentChat({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Describe the incident or ask Kairo..."
-            className="flex-1 bg-transparent text-[14px] text-gray-900 placeholder:text-gray-400 focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] leading-6 text-gray-900 placeholder:text-gray-400 focus:outline-none"
           />
           <button
             onClick={handleSend}
@@ -475,12 +475,12 @@ function ReasoningStages({
     status === "loaded" ? stageLabels.length : status === "loading" ? 2 : stages.length
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-3">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">
+    <div className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <span className="text-[12px] font-bold uppercase tracking-[0.12em] text-gray-400">
           Reasoning pipeline
         </span>
-        <span className="text-[10px] font-semibold text-gray-500">{status}</span>
+        <span className="text-[12px] font-semibold text-gray-500">{status}</span>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {stageLabels.map((label, index) => {
@@ -489,7 +489,7 @@ function ReasoningStages({
             <span
               key={label}
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold",
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[12px] font-semibold",
                 done
                   ? "border-teal-100 bg-teal-50 text-teal-700"
                   : "border-gray-100 bg-white text-gray-400"
@@ -532,16 +532,16 @@ function StructuredReasoning({
 
   return (
     <div className="mb-2 w-full overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-      <div className="border-b border-gray-100 bg-[#FAFAFA] px-4 py-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-teal-700">
+      <div className="border-b border-gray-100 bg-[#FAFAFA] px-5 py-4">
+        <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-teal-700">
           Incident Intelligence Report
         </p>
-        <p className="mt-1 text-[13px] font-semibold leading-5 text-gray-950">
+        <p className="mt-2 text-[18px] font-semibold leading-7 text-gray-950">
           {analysis.diagnosis}
         </p>
       </div>
 
-      <div className="space-y-3 px-4 py-4">
+      <div className="space-y-4 px-5 py-5">
         <ReportSection icon={Brain} title="Most likely cause">
           {analysis.likely_cause}
         </ReportSection>
@@ -561,8 +561,8 @@ function StructuredReasoning({
         )}
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <div className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.1em] text-gray-500">
               <BadgeCheck className="h-3 w-3" />
               Evidence strength
             </div>
@@ -570,12 +570,12 @@ function StructuredReasoning({
               {typeof evidenceStrength === "number" ? formatEvidenceStrength(evidenceStrength) : "Measured"}
             </p>
           </div>
-          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <div className="mb-1 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.1em] text-gray-500">
               <Activity className="h-3 w-3" />
               Uncertainty
             </div>
-            <p className="line-clamp-3 text-[11px] leading-5 text-gray-600">
+            <p className="line-clamp-3 text-[14px] leading-6 text-gray-600">
               {analysis.uncertainty_note}
             </p>
           </div>
@@ -584,9 +584,9 @@ function StructuredReasoning({
         <ReportSection icon={FileDown} title="Evidence used / memory sources">
           <div className="space-y-1.5">
             {evidence.slice(0, 4).map((ref) => (
-              <div key={ref.id} className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">
-                <p className="truncate text-[11px] font-semibold text-gray-900">{ref.title}</p>
-                <p className="text-[10px] text-gray-500">
+              <div key={ref.id} className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+                <p className="truncate text-[13px] font-semibold text-gray-900">{ref.title}</p>
+                <p className="text-[12px] leading-5 text-gray-500">
                   {ref.vendor} · {formatEvidenceStrength(ref.similarity)} evidence
                 </p>
               </div>
@@ -614,14 +614,14 @@ function ReportSection({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-lg border border-gray-100 bg-white p-3">
+    <section className="rounded-lg border border-gray-100 bg-white p-4">
       <div className="mb-2 flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-teal-700" />
-        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">
+        <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-gray-500">
           {title}
         </p>
       </div>
-      <div className="text-[12px] leading-5 text-gray-700">{children}</div>
+      <div className="text-[15px] leading-7 text-gray-700">{children}</div>
     </section>
   )
 }

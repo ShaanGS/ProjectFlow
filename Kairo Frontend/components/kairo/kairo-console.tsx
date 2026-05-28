@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Activity, Brain, Network, PanelRightClose, X } from "lucide-react"
+import { Activity, Brain, Network, X } from "lucide-react"
 import { AgentChat } from "./agent-chat"
 import { cn } from "@/lib/utils"
 import type { AgentReasoning, AgentRuntimeResponse } from "@/types/agent"
@@ -52,22 +52,22 @@ export function KairoConsole({
       />
       <section className="relative h-full w-[min(1180px,calc(100vw-28px))] overflow-hidden border-l border-gray-200 bg-white shadow-2xl transition-transform duration-300">
         <div className="flex h-full flex-col">
-          <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6">
+          <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-gray-100 bg-white px-7">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-teal-100 bg-teal-50">
                 <Brain className="h-4 w-4 text-teal-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-teal-700">
+                <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-teal-700">
                   Kairo Console
                 </p>
-                <h2 className="truncate text-[16px] font-bold tracking-[-0.02em] text-gray-950">
+                <h2 className="truncate text-[20px] font-bold leading-tight tracking-tight text-gray-950">
                   {activeIncident?.title ?? "Incident intelligence workspace"}
                 </h2>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="hidden rounded-full border border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 sm:inline-flex">
+              <span className="hidden rounded-full border border-gray-100 bg-gray-50 px-3 py-1.5 text-[12px] font-semibold text-gray-600 sm:inline-flex">
                 {memoryMatches.length} memories · analysis {reasoningStatus}
               </span>
               <button
@@ -128,13 +128,13 @@ function MemoryExplorer({
 
   return (
     <aside className="flex min-h-0 flex-col bg-[#FAFAFA]">
-      <div className="shrink-0 border-b border-gray-100 bg-white px-5 py-4">
+      <div className="shrink-0 border-b border-gray-100 bg-white px-6 py-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400">
+            <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-gray-400">
               Memory Explorer
             </p>
-            <p className="mt-1 text-[13px] font-semibold text-gray-900">
+            <p className="mt-1 text-[15px] font-semibold leading-6 text-gray-900">
               Evidence graph and retained incidents
             </p>
           </div>
@@ -144,7 +144,7 @@ function MemoryExplorer({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         {memoryStatus === "loading" && (
           <div className="space-y-3">
             <div className="h-36 rounded-xl border border-gray-100 bg-white" />
@@ -160,7 +160,7 @@ function MemoryExplorer({
         )}
 
         {memoryStatus !== "loading" && memoryStatus !== "error" && memoryMatches.length === 0 && (
-          <div className="rounded-xl border border-gray-100 bg-white px-4 py-5 text-[13px] font-medium text-gray-500">
+          <div className="rounded-xl border border-gray-100 bg-white px-5 py-6 text-[15px] font-medium leading-6 text-gray-500">
             No recalled incidents yet. Simulate or select an incident to build the evidence map.
           </div>
         )}
@@ -176,14 +176,14 @@ function MemoryExplorer({
 
             {selectedMemory && <MemoryDetailCard match={selectedMemory} />}
 
-            <section className="rounded-xl border border-gray-100 bg-white p-4">
+            <section className="rounded-xl border border-gray-100 bg-white p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Activity className="h-3.5 w-3.5 text-teal-700" />
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-500">
+                <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-gray-500">
                   Cause preview
                 </p>
               </div>
-              <p className="text-[12px] leading-5 text-gray-700">
+              <p className="text-[15px] leading-7 text-gray-700">
                 {agentAnalysis?.likely_cause ??
                   selectedMemory?.root_cause ??
                   selectedMemory?.metadata?.actual_root_cause ??
@@ -209,11 +209,11 @@ function MemoryGraph({
   onSelectMemory: (id: string) => void
 }) {
   return (
-    <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <section className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Network className="h-3.5 w-3.5 text-teal-700" />
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-500">
+          <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-gray-500">
             Relationship Map
           </p>
         </div>
@@ -225,10 +225,10 @@ function MemoryGraph({
       <div className="relative pb-1">
         <div className="absolute left-1/2 top-[54px] h-px w-[78%] -translate-x-1/2 bg-teal-100" />
         <div className="relative z-10 mx-auto flex min-h-[66px] w-40 flex-col items-center justify-center rounded-xl border border-gray-900 bg-gray-900 px-3 text-center shadow-sm">
-          <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-white/60">
+          <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/60">
             active incident
           </span>
-          <span className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-white">
+          <span className="mt-1 line-clamp-2 text-[13px] font-semibold leading-5 text-white">
             {activeIncident?.vendor ?? "incident"} · {activeIncident?.region ?? "region"}
           </span>
         </div>
@@ -250,15 +250,15 @@ function MemoryGraph({
                     : "border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50"
                 )}
               >
-                <span className="block truncate text-[10px] font-bold uppercase tracking-[0.08em] text-teal-700">
+                <span className="block truncate text-[12px] font-bold uppercase tracking-[0.08em] text-teal-700">
                   {match.vendor ?? match.metadata?.vendor ?? "memory"}
                 </span>
-                <span className="mt-1 block text-[13px] font-bold text-gray-950">
+                <span className="mt-1 block text-[15px] font-bold text-gray-950">
                   {typeof match.similarity === "number"
                     ? formatEvidenceStrength(match.similarity)
                     : "match"}
                 </span>
-                <span className="mt-1 block truncate text-[10px] font-semibold text-gray-500">
+                <span className="mt-1 block truncate text-[12px] font-semibold text-gray-500">
                   {relation}
                 </span>
               </button>
@@ -279,13 +279,13 @@ function MemoryDetailCard({ match }: { match: MemoryMatch }) {
     : meta.patterns_matched?.split(",").map((item) => item.trim()).filter(Boolean) ?? []
 
   return (
-    <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <section className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[11px] font-bold uppercase tracking-[0.1em] text-teal-700">
+          <p className="truncate text-[12px] font-bold uppercase tracking-[0.1em] text-teal-700">
             {match.vendor ?? meta.vendor ?? "memory"}
           </p>
-          <h3 className="mt-1 text-[13px] font-bold leading-5 text-gray-950">
+          <h3 className="mt-1 text-[16px] font-bold leading-6 text-gray-950">
             {match.title ?? meta.title ?? "Prior incident"}
           </h3>
         </div>
@@ -296,7 +296,7 @@ function MemoryDetailCard({ match }: { match: MemoryMatch }) {
         )}
       </div>
 
-      <div className="space-y-3 text-[12px] leading-5 text-gray-700">
+      <div className="space-y-4 text-[15px] leading-7 text-gray-700">
         <DetailLine label="Root cause" value={rootCause} />
         <DetailLine label="Fix" value={fix} />
         <DetailLine
@@ -326,7 +326,7 @@ function DetailLine({ label, value }: { label: string; value?: string | null }) 
 
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400">
+      <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-gray-400">
         {label}
       </p>
       <p className="mt-1 text-gray-700">{value}</p>

@@ -67,3 +67,4 @@ export interface MemoryMatch {
 }
 
 export type LoadStatus = "idle" | "loading" | "loaded" | "error"
+export type SimulationStage = "idle" | "processing" | "incident" | "memory" | "match" | "action"

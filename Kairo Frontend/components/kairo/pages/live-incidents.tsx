@@ -3,7 +3,7 @@
 import { MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { VendorLogo } from "../vendor-logo"
-import type { ApiIncident, DisplayIncident, LoadStatus, MemoryMatch } from "@/types/kairo"
+import type { ApiIncident, DisplayIncident, LoadStatus, MemoryMatch, SimulationStage } from "@/types/kairo"
 
 export function LiveIncidentsPage({
   activeIncidents,
@@ -20,6 +20,7 @@ export function LiveIncidentsPage({
   incidentListStatus,
   incidentListError,
   flowError,
+  simulationStage,
 }: {
   activeIncidents: DisplayIncident[]
   resolvedIncidents: DisplayIncident[]
@@ -35,6 +36,7 @@ export function LiveIncidentsPage({
   incidentListStatus: LoadStatus
   incidentListError: string | null
   flowError: string | null
+  simulationStage: SimulationStage
 }) {
   const memoryHits = memoryMatches.length
   const timeSavedLabel = timeSavedMinutes > 0 ? `${timeSavedMinutes}m` : "0m"
@@ -43,7 +45,7 @@ export function LiveIncidentsPage({
   return (
     <div className="min-w-0 flex-1 overflow-y-auto bg-white">
       {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4 border-b border-gray-100 bg-white px-6 py-5">
+      <div className="grid grid-cols-3 gap-5 border-b border-gray-100 bg-white px-8 py-6">
         <StatBlock
           label="MEMORY RECALL HITS"
           value={memoryStatus === "loading" ? "…" : String(memoryHits)}
@@ -61,18 +63,34 @@ export function LiveIncidentsPage({
         />
       </div>
 
+      {simulationStage === "processing" && (
+        <div className="kairo-stage-in border-b border-gray-100 bg-[#FAFAFA] px-8 py-6">
+          <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-teal-700">
+              Processing alert
+            </p>
+            <h2 className="mt-2 text-[21px] font-bold leading-tight tracking-tight text-gray-950">
+              Normalizing incident context
+            </h2>
+            <p className="mt-2 max-w-2xl text-[15px] leading-6 text-gray-500">
+              Kairo is preparing the alert before memory recall and analysis appear in sequence.
+            </p>
+          </div>
+        </div>
+      )}
+
       {activeIncident && (
-        <div className="border-b border-gray-100 bg-[#FAFAFA] px-6 py-5">
+        <div className="kairo-stage-in border-b border-gray-100 bg-[#FAFAFA] px-8 py-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">
+              <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-teal-700">
                 Active Incident
               </p>
-              <h2 className="mt-1 text-[18px] font-bold tracking-[-0.02em] text-gray-900">
+              <h2 className="mt-2 text-[22px] font-bold leading-tight tracking-tight text-gray-900">
                 {activeIncident.title}
               </h2>
               {activeIncident.customer_impact && (
-                <p className="mt-1 text-[13px] font-medium text-gray-500">
+                <p className="mt-2 max-w-3xl text-[15px] font-medium leading-6 text-gray-500">
                   {activeIncident.customer_impact}
                 </p>
               )}
@@ -91,15 +109,15 @@ export function LiveIncidentsPage({
       )}
 
       {flowError && (
-        <div className="border-b border-red-100 bg-red-50 px-6 py-3 text-[12px] font-semibold text-red-700">
+        <div className="border-b border-red-100 bg-red-50 px-8 py-3 text-[13px] font-semibold text-red-700">
           {flowError}
         </div>
       )}
 
       {/* Incident Tables */}
       <div className="flex-1">
-        <div className="flex items-center gap-3 px-6 py-4">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+        <div className="flex items-center gap-3 px-8 py-5">
+          <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-gray-500">
             live incident queue
           </span>
           <div className="h-px flex-1 bg-gray-100" />
@@ -113,8 +131,8 @@ export function LiveIncidentsPage({
         />
         
         {/* Resolved divider */}
-        <div className="flex items-center gap-3 border-t border-gray-100 px-6 py-6">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+        <div className="flex items-center gap-3 border-t border-gray-100 px-8 py-6">
+          <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-gray-500">
             memory corpus / resolved history
           </span>
           <div className="flex-1 h-px bg-gray-100" />
@@ -144,15 +162,15 @@ function StatBlock({
   subtitle: string
 }) {
   return (
-    <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
-      <p className="min-h-[30px] text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+      <p className="min-h-[30px] text-[12px] font-semibold uppercase tracking-[0.12em] text-gray-500">
         {label}
       </p>
       <div className="mt-3 flex flex-col">
-        <p className="text-[32px] font-bold leading-none tracking-[-0.04em] text-gray-900">{value}</p>
+        <p className="text-[34px] font-bold leading-none tracking-tight text-gray-900">{value}</p>
         <div className="mt-3 h-0.5 w-8 bg-teal-600" />
       </div>
-      <p className="mt-3 text-[12px] font-medium text-gray-500">{subtitle}</p>
+      <p className="mt-3 text-[14px] font-medium leading-6 text-gray-500">{subtitle}</p>
     </div>
   )
 }
@@ -219,19 +237,19 @@ function IncidentTable({
   return (
     <div className={cn("bg-white", isResolved && "opacity-70")}>
       {isResolved && listStatus === "loading" && (
-        <div className="space-y-3 px-6 py-4">
+        <div className="space-y-3 px-8 py-4">
           {[0, 1, 2].map((item) => (
             <div key={item} className="h-[54px] rounded-lg border border-gray-100 bg-gray-50" />
           ))}
         </div>
       )}
       {isResolved && listStatus === "error" && (
-        <div className="px-6 py-5 text-[13px] font-medium text-red-700">
+        <div className="px-8 py-5 text-[15px] font-medium text-red-700">
           {listError ?? "retrieval failed while loading incidents"}
         </div>
       )}
       {!isResolved && incidents.length === 0 && (
-        <div className="border-b border-gray-100 px-6 py-8 text-[13px] font-medium text-gray-500">
+        <div className="border-b border-gray-100 px-8 py-8 text-[15px] font-medium leading-6 text-gray-500">
           No live incidents. Simulate an incident to start retrieval and analysis.
         </div>
       )}
@@ -241,7 +259,7 @@ function IncidentTable({
           key={`${isResolved ? "resolved" : "active"}-${incident.id}-${index}`}
           onClick={() => onSelectIncident(incident)}
           className={cn(
-            "grid min-h-[72px] cursor-pointer grid-cols-[18px_minmax(160px,1fr)_44px_104px_76px_72px_86px_56px] items-center gap-2 border-b border-gray-100 px-6 py-4 transition-colors",
+            "kairo-stage-in grid min-h-[76px] cursor-pointer grid-cols-[18px_minmax(160px,1fr)_44px_104px_76px_72px_86px_56px] items-center gap-3 border-b border-gray-100 px-8 py-4 transition-colors",
             incident.status === "live" && incident.severity === "critical" && "border-l-4 border-l-[#EE4444] hover:bg-[#FAFAFA]",
             incident.status === "live" && incident.severity === "warning" && "border-l-4 border-l-[#F59E0B] hover:bg-[#FAFAFA]",
             incident.status === "resolved" && "hover:bg-[#FAFAFA]"
@@ -260,7 +278,7 @@ function IncidentTable({
           </div>
 
           {/* Name */}
-          <div className="truncate text-[13px] font-semibold text-gray-900">
+          <div className="truncate text-[15px] font-semibold leading-6 text-gray-900">
             {incident.name}
           </div>
 
@@ -296,7 +314,7 @@ function IncidentTable({
           </div>
 
           {/* Time */}
-          <div className="truncate text-[11px] font-medium text-gray-500">{incident.time}</div>
+          <div className="truncate text-[13px] font-medium text-gray-500">{incident.time}</div>
 
           {/* Memory Matches */}
           <div>

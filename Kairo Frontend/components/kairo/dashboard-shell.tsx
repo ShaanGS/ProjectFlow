@@ -10,7 +10,7 @@ import { VendorsOverviewPage } from "./pages/vendors-overview"
 import { MemoryLogPage } from "./pages/memory-log"
 import { PatternRulesPage } from "./pages/pattern-rules"
 import { Brain, Plus } from "lucide-react"
-import type { ApiIncident, DisplayIncident, LoadStatus, MemoryMatch } from "@/types/kairo"
+import type { ApiIncident, DisplayIncident, LoadStatus, MemoryMatch, SimulationStage } from "@/types/kairo"
 import type { AgentReasoning, AgentRuntimeResponse } from "@/types/agent"
 
 interface AgentMessage {
@@ -66,6 +66,10 @@ function buildIncidentDescription(incident: ApiIncident) {
     .join(" ")
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
 export function DashboardShell() {
   const [activePage, setActivePage] = useState("incidents")
   const [activeVendor, setActiveVendor] = useState<string | null>(null)
@@ -86,6 +90,7 @@ export function DashboardShell() {
   const [flowError, setFlowError] = useState<string | null>(null)
   const [agentThreadKey, setAgentThreadKey] = useState(0)
   const [isConsoleOpen, setIsConsoleOpen] = useState(false)
+  const [simulationStage, setSimulationStage] = useState<SimulationStage>("idle")
 
   useEffect(() => {
     fetch("/api/incidents")
@@ -230,6 +235,7 @@ export function DashboardShell() {
             incidentListStatus={incidentListStatus}
             incidentListError={incidentListError}
             flowError={flowError}
+            simulationStage={simulationStage}
           />
         )
       case "vendors":
@@ -255,13 +261,16 @@ export function DashboardShell() {
             incidentListStatus={incidentListStatus}
             incidentListError={incidentListError}
             flowError={flowError}
+            simulationStage={simulationStage}
           />
         )
     }
   }
 
   const loadIncidentReasoning = async (incident: ApiIncident) => {
+    setSimulationStage("processing")
     setActiveIncident(incident)
+    setSimulationStage("incident")
     setMemoryStatus("loading")
     setReasoningStatus("loading")
     setMemoryMatches([])
@@ -269,6 +278,7 @@ export function DashboardShell() {
     setAgentStages([])
     setFlowError(null)
     setAgentThreadKey((previous) => previous + 1)
+    setSimulationStage("processing")
 
     const memoryResponse = await fetch("/api/incidents", {
       method: "POST",
@@ -284,6 +294,7 @@ export function DashboardShell() {
     const matches = (memoryData.matches ?? []) as MemoryMatch[]
     setMemoryMatches(matches)
     setMemoryStatus("loaded")
+    setSimulationStage("memory")
 
     const chatResponse = await fetch("/api/chat", {
       method: "POST",
@@ -310,6 +321,7 @@ export function DashboardShell() {
     setReasoningStatus("loaded")
     setAgentAnalysis(chatData.analysis ?? null)
     setAgentStages(chatData.stages ?? [])
+    setSimulationStage("action")
     setAgentMessage({
       id: `analysis_${incident.incident_id}_${Date.now()}`,
       role: "assistant",
@@ -340,6 +352,7 @@ export function DashboardShell() {
         role: "assistant",
         content: `Selection failed: ${message}`,
       })
+      setSimulationStage("idle")
     }
   }
 
@@ -422,6 +435,7 @@ export function DashboardShell() {
       })
     } finally {
       setIsResolving(false)
+      setSimulationStage("idle")
     }
   }
 
@@ -431,6 +445,7 @@ export function DashboardShell() {
     setIsSimulating(true)
     setActivePage("incidents")
     setActiveVendor(null)
+    setActiveIncident(null)
     setMemoryStatus("loading")
     setReasoningStatus("loading")
     setMemoryMatches([])
@@ -438,6 +453,7 @@ export function DashboardShell() {
     setAgentStages([])
     setFlowError(null)
     setAgentThreadKey((previous) => previous + 1)
+    setSimulationStage("processing")
 
     try {
       const response = await fetch("/api/alert", {
@@ -464,7 +480,9 @@ export function DashboardShell() {
         .filter(Boolean)
         .join(" ")
 
+      await wait(220)
       setActiveIncident(incident)
+      setSimulationStage("incident")
 
       // Use the matches already recalled by /api/alert — no second round-trip needed
       const matches = (data.recalledIncidents ?? []) as MemoryMatch[]
@@ -478,16 +496,25 @@ export function DashboardShell() {
           status: "live",
           severity: mapSeverity(incident.severity),
           time: "just now",
-          memoryMatches: matchCount,
+          memoryMatches: 0,
           classification: data.classification,
           raw: incident,
         },
         ...previous.filter((item) => item.id !== incident.incident_id),
       ])
 
+      await wait(360)
       // Populate Episodic Memory panel immediately from alert recall
       setMemoryMatches(matches)
       setMemoryStatus(matches.length > 0 ? "loaded" : "loaded")
+      setSimulationStage("memory")
+      setActiveIncidents((previous) =>
+        previous.map((item) =>
+          item.id === incident.incident_id
+            ? { ...item, memoryMatches: matchCount }
+            : item
+        )
+      )
 
       // Pass the same retrieved matches into chat so reasoning is grounded in them
       const chatResponse = await fetch("/api/chat", {
@@ -513,6 +540,7 @@ export function DashboardShell() {
 
       // If chat returned fresher matches (it re-recalled), keep the larger set
       const chatMatches = (chatData.recalledIncidents ?? []) as MemoryMatch[]
+      await wait(360)
       if (chatMatches.length > matches.length) {
         setMemoryMatches(chatMatches)
         setActiveIncidents((previous) =>
@@ -523,10 +551,13 @@ export function DashboardShell() {
           )
         )
       }
+      setSimulationStage("match")
 
+      await wait(360)
       setReasoningStatus("loaded")
       setAgentAnalysis(chatData.analysis ?? data.structuredAnalysis ?? null)
       setAgentStages(chatData.stages ?? [])
+      setSimulationStage("action")
       setAgentMessage({
         id: `sim_${Date.now()}`,
         role: "assistant",
@@ -545,13 +576,14 @@ export function DashboardShell() {
         role: "assistant",
         content: `Simulation failed: ${message}`,
       })
+      setSimulationStage("idle")
     } finally {
       setIsSimulating(false)
     }
   }
 
   return (
-    <div className="flex h-screen w-full bg-white font-sans antialiased">
+    <div className="flex h-screen w-full bg-white font-sans text-[15px] leading-[1.5] antialiased">
       {/* Left Navigation */}
       <LeftNav
         activePage={activePage}
@@ -564,8 +596,8 @@ export function DashboardShell() {
       {/* Main Content Area */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-8">
-          <h1 className="text-xl font-semibold tracking-tight text-gray-900">{getPageTitle()}</h1>
+        <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-gray-100 bg-white px-8">
+          <h1 className="text-[30px] font-bold leading-tight tracking-tight text-gray-900">{getPageTitle()}</h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -581,7 +613,7 @@ export function DashboardShell() {
               className="flex items-center gap-2 rounded-full bg-gray-900 px-6 py-2.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
             >
               <Plus className="h-4 w-4" />
-              {isSimulating ? "Simulating..." : "Simulate Incident"}
+              {isSimulating ? "Processing..." : "Simulate Incident"}
             </button>
           </div>
         </header>
@@ -599,6 +631,7 @@ export function DashboardShell() {
         memoryStatus={memoryStatus}
         reasoningStatus={reasoningStatus}
         agentAnalysis={agentAnalysis}
+        simulationStage={simulationStage}
         onOpenConsole={() => setIsConsoleOpen(true)}
       />
 
