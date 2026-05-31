@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import { MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { VendorLogo } from "../vendor-logo"
@@ -41,6 +42,29 @@ export function LiveIncidentsPage({
   const memoryHits = memoryMatches.length
   const timeSavedLabel = timeSavedMinutes > 0 ? `${timeSavedMinutes}m` : "0m"
   const activePriority = getPriorityFromSeverity(activeIncident?.severity)
+  const memoryScrollRef = useRef<HTMLDivElement | null>(null)
+  const [showMemoryFade, setShowMemoryFade] = useState(false)
+
+  useEffect(() => {
+    const element = memoryScrollRef.current
+    if (!element) return
+
+    const updateFade = () => {
+      const hasMoreBelow =
+        element.scrollHeight - element.scrollTop - element.clientHeight > 8
+      setShowMemoryFade(hasMoreBelow)
+    }
+
+    updateFade()
+    element.addEventListener("scroll", updateFade, { passive: true })
+    const resizeObserver = new ResizeObserver(updateFade)
+    resizeObserver.observe(element)
+
+    return () => {
+      element.removeEventListener("scroll", updateFade)
+      resizeObserver.disconnect()
+    }
+  }, [resolvedIncidents.length, incidentListStatus])
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
@@ -138,7 +162,11 @@ export function LiveIncidentsPage({
           <div className="flex-1 h-px bg-gray-100" />
         </div>
         
-        <div className="min-h-[220px] flex-1 overflow-y-auto overscroll-contain [max-height:min(42vh,520px)]">
+        <div className="relative min-h-[220px] flex-1">
+        <div
+          ref={memoryScrollRef}
+          className="h-full min-h-[220px] overflow-y-auto overscroll-contain [max-height:min(42vh,520px)]"
+        >
           <IncidentTable
             incidents={resolvedIncidents}
             isResolved
@@ -148,6 +176,10 @@ export function LiveIncidentsPage({
             onResolveIncident={onResolveIncident}
             resolvingIncidentId={resolvingIncidentId}
           />
+        </div>
+          {showMemoryFade && (
+            <div className="memory-corpus-fade pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/92 to-transparent" />
+          )}
         </div>
       </div>
     </div>

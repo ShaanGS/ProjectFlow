@@ -148,26 +148,68 @@ const suggestionCards = [
 ]
 
 function stripHiddenReasoning(content: string) {
-  return content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
+  return content
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/\*\*/g, "")
+    .replace(/\(from memory\)/gi, "")
+    .replace(/\[(plain sentence|incident title|strong \/ moderate \/ weak|past incident title|vendor|confidence label|one clear action)\]/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
 }
 
 function normalizeAssistantReply(content: string) {
   const clean = stripHiddenReasoning(content)
   const lines = clean
     .split(/\n+/)
-    .map((line) => line.replace(/^[-*]\s*/, "").trim())
+    .map((line) => line.replace(/^[-*]\s*/, "").replace(/^\d+\.\s*/, "").trim())
     .filter(Boolean)
 
-  const likelyCause = lines.find((line) => /cause|root cause|degradation|gateway|timeout/i.test(line))
-  const recommendedAction = lines.find((line) => /recommend|action|resolution|resolve|fail over|monitor|check|skip/i.test(line))
-  const evidence = lines.find((line) => /evidence|memory|similar|match|aligns|based on/i.test(line))
-  const opening = lines.find((line) => line !== likelyCause && line !== recommendedAction && line !== evidence) ?? clean
+  const readValue = (label: RegExp) => {
+    const line = lines.find((item) => label.test(item))
+    return line?.replace(label, "").trim()
+  }
+
+  const matchFound = readValue(/^Match found:\s*/i)
+  const rootCause = readValue(/^Root cause:\s*/i)
+  const resolution = readValue(/^Resolution used:\s*/i)
+  const recommendedNextStep = readValue(/^Recommended next step:\s*/i)
+  const confidence = readValue(/^Confidence:\s*/i)
+  const stepsIndex = lines.findIndex((line) => /^Steps:\s*$/i.test(line))
+  const steps =
+    stepsIndex >= 0
+      ? lines
+          .slice(stepsIndex + 1)
+          .filter((line) => !/^(Want me|Should I|Ask me)/i.test(line))
+          .slice(0, 3)
+      : []
+  const closing =
+    lines.find((line) => /^(Want me|Should I|Ask me)/i.test(line)) ??
+    "Want me to draft this as a postmortem?"
+  const sectionLines = new Set(
+    [matchFound, rootCause, resolution, recommendedNextStep, confidence, closing, "Steps:", ...steps]
+      .filter(Boolean)
+      .map((item) => String(item))
+  )
+  const opening =
+    lines.find((line) => {
+      const value = line
+        .replace(/^Match found:\s*/i, "")
+        .replace(/^Root cause:\s*/i, "")
+        .replace(/^Resolution used:\s*/i, "")
+        .replace(/^Recommended next step:\s*/i, "")
+        .replace(/^Confidence:\s*/i, "")
+      return !sectionLines.has(line) && !sectionLines.has(value) && !/^Steps:\s*$/i.test(line)
+    }) ?? clean
 
   return {
     opening: opening || "Here is the incident guidance from the retrieved memory.",
-    likelyCause,
-    recommendedAction,
-    evidence,
+    matchFound,
+    rootCause,
+    resolution,
+    recommendedNextStep,
+    confidence,
+    steps,
+    closing,
     fallback: clean,
   }
 }
@@ -204,7 +246,13 @@ export function AgentChat({
     if (!injectedMessage) return
 
     setMessages((previous) => {
-      if (previous.some((message) => message.id === injectedMessage.id)) return previous
+      if (previous.some((message) => message.id === injectedMessage.id)) {
+        return previous.map((message) =>
+          message.id === injectedMessage.id
+            ? { ...message, ...injectedMessage }
+            : message
+        )
+      }
       return [...previous, injectedMessage]
     })
   }, [injectedMessage])
@@ -534,25 +582,70 @@ function AssistantReply({ content }: { content: string }) {
   }
 
   return (
-    <div className="kairo-message-in w-full rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-teal-600 shadow-[0_0_0_4px_rgba(13,148,136,0.12)]" />
-        <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-gray-500">
-          SRE guidance
+    <div className="kairo-message-in w-full rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.07)]">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-teal-600 shadow-[0_0_0_4px_rgba(13,148,136,0.12)]" />
+            <p className="text-[12px] font-semibold text-slate-500">
+              Incident guidance
+            </p>
+          </div>
+          {reply.confidence && (
+            <span className="rounded-full border border-teal-100 bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700">
+              {reply.confidence}
+            </span>
+          )}
+        </div>
+        <p className="mt-3 text-[16px] font-semibold leading-7 text-slate-950">
+          {reply.opening}
         </p>
       </div>
-      <p className="text-[15px] font-medium leading-7 text-gray-800">{reply.opening}</p>
 
-      <div className="mt-4 grid gap-3">
-        {reply.likelyCause && (
-          <ReplySection title="Likely cause">{reply.likelyCause}</ReplySection>
+      <div className="space-y-3 px-5 py-4">
+        {reply.matchFound && (
+          <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3">
+            <p className="text-[12px] font-semibold text-teal-700">
+              Match found:
+            </p>
+            <p className="mt-1 text-[14px] font-semibold leading-6 text-slate-800">
+              {reply.matchFound}
+            </p>
+          </div>
         )}
-        {reply.recommendedAction && reply.recommendedAction !== reply.likelyCause && (
-          <ReplySection title="Recommended action">{reply.recommendedAction}</ReplySection>
+        {reply.rootCause && (
+          <ReplySection title="Root cause:">{reply.rootCause}</ReplySection>
         )}
-        {reply.evidence && reply.evidence !== reply.likelyCause && reply.evidence !== reply.recommendedAction && (
-          <ReplySection title="Evidence">{reply.evidence}</ReplySection>
+        {reply.resolution && (
+          <ReplySection title="Resolution used:">{reply.resolution}</ReplySection>
         )}
+        {reply.steps.length > 0 && (
+          <ReplySection title="Steps">
+            <ol className="space-y-1">
+              {reply.steps.map((step, index) => (
+                <li key={`${step}-${index}`}>
+                  {index + 1}. {step}
+                </li>
+              ))}
+            </ol>
+          </ReplySection>
+        )}
+        {reply.recommendedNextStep && (
+          <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+            <Target className="mt-1 h-3.5 w-3.5 shrink-0 text-teal-700" />
+            <div>
+              <p className="text-[12px] font-semibold text-slate-500">
+                Recommended next step:
+              </p>
+              <p className="mt-1 text-[14px] font-semibold leading-6 text-slate-800">
+                {reply.recommendedNextStep}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="border-t border-slate-100 px-5 py-3">
+        <p className="text-[13px] font-medium leading-6 text-slate-500">{reply.closing}</p>
       </div>
     </div>
   )
@@ -560,9 +653,9 @@ function AssistantReply({ content }: { content: string }) {
 
 function ReplySection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">{title}</p>
-      <p className="mt-1 text-[14px] leading-6 text-gray-700">{children}</p>
+    <div className="rounded-xl border border-slate-100 bg-white px-4 py-3">
+      <p className="text-[12px] font-semibold text-slate-500">{title}</p>
+      <div className="mt-1 text-[14px] leading-6 text-slate-700">{children}</div>
     </div>
   )
 }

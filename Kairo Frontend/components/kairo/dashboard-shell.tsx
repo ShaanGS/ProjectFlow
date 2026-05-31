@@ -267,6 +267,65 @@ export function DashboardShell() {
     }
   }
 
+  const streamInitialAssistantBrief = async (incident: ApiIncident, matches: MemoryMatch[]) => {
+    const assistantId = `brief_${incident.incident_id}_${Date.now()}`
+    setAgentMessage({
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      stages: [],
+    })
+
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        currentIncident: incident,
+        past_episodes: matches,
+        mode: "incident_brief",
+        stream: true,
+        messages: [
+          {
+            role: "user",
+            content: `Prepare the initial incident brief for: ${buildIncidentDescription(incident)}`,
+          },
+        ],
+      }),
+    })
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      throw new Error(payload?.error ?? "analysis failed")
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) throw new Error("analysis stream unavailable")
+
+    const decoder = new TextDecoder()
+    let streamedContent = ""
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      streamedContent += decoder.decode(value, { stream: true })
+      setAgentMessage((current) =>
+        current?.id === assistantId
+          ? { ...current, content: streamedContent }
+          : current
+      )
+    }
+
+    const tail = decoder.decode()
+    if (tail) {
+      streamedContent += tail
+      setAgentMessage((current) =>
+        current?.id === assistantId
+          ? { ...current, content: streamedContent }
+          : current
+      )
+    }
+  }
+
   const loadIncidentReasoning = async (incident: ApiIncident) => {
     setSimulationStage("processing")
     setActiveIncident(incident)
@@ -296,43 +355,19 @@ export function DashboardShell() {
     setMemoryStatus("loaded")
     setSimulationStage("memory")
 
-    const chatResponse = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        currentIncident: incident,
-        past_episodes: matches,
-        messages: [
-          {
-            role: "user",
-            content: `Analyze this active incident using memory: ${buildIncidentDescription(incident)}`,
-          },
-        ],
-      }),
-    })
-    const chatPayload = await chatResponse.json()
-    if (!chatResponse.ok || !chatPayload.success) {
-      throw new Error(chatPayload.error ?? "analysis failed")
-    }
-    const chatData = chatPayload.data
-
-    const chatMatches = (chatData.recalledIncidents ?? matches) as MemoryMatch[]
-    setMemoryMatches(chatMatches)
     setReasoningStatus("loaded")
-    setAgentAnalysis(chatData.analysis ?? null)
-    setAgentStages(chatData.stages ?? [])
+    setAgentAnalysis(null)
+    setAgentStages([
+      { name: "input", status: "completed", summary: "Normalized active incident context." },
+      { name: "retrieval", status: "completed", summary: `Used ${matches.length} memory match(es).` },
+      { name: "reasoning", status: "completed", summary: "Generated the initial Kairo incident brief." },
+    ])
     setSimulationStage("action")
-    setAgentMessage({
-      id: `analysis_${incident.incident_id}_${Date.now()}`,
-      role: "assistant",
-      content: chatData.response,
-      analysis: chatData.analysis,
-      stages: chatData.stages,
-    })
+    await streamInitialAssistantBrief(incident, matches)
     setActiveIncidents((previous) =>
       previous.map((item) =>
         item.id === incident.incident_id
-          ? { ...item, memoryMatches: chatMatches.length }
+          ? { ...item, memoryMatches: matches.length }
           : item
       )
     )
@@ -470,16 +505,6 @@ export function DashboardShell() {
       const data = alertPayload.data
 
       const incident = data.incident as ApiIncident
-      const incidentDescription = [
-        incident.vendor ?? "internal",
-        incident.region,
-        incident.title,
-        ...(incident.symptoms ?? []),
-        incident.customer_impact,
-      ]
-        .filter(Boolean)
-        .join(" ")
-
       await wait(220)
       setActiveIncident(incident)
       setSimulationStage("incident")
@@ -516,55 +541,19 @@ export function DashboardShell() {
         )
       )
 
-      // Pass the same retrieved matches into chat so reasoning is grounded in them
-      const chatResponse = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentIncident: incident,
-          past_episodes: matches,
-          messages: [
-            {
-              role: "user",
-              content: `Analyze this active incident using memory: ${incidentDescription}`,
-            },
-          ],
-        }),
-      })
-      const chatPayload = await chatResponse.json()
-
-      if (!chatResponse.ok || !chatPayload.success) {
-        throw new Error(chatPayload.error ?? "analysis failed")
-      }
-      const chatData = chatPayload.data
-
-      // If chat returned fresher matches (it re-recalled), keep the larger set
-      const chatMatches = (chatData.recalledIncidents ?? []) as MemoryMatch[]
       await wait(360)
-      if (chatMatches.length > matches.length) {
-        setMemoryMatches(chatMatches)
-        setActiveIncidents((previous) =>
-          previous.map((item) =>
-            item.id === incident.incident_id
-              ? { ...item, memoryMatches: chatMatches.length }
-              : item
-          )
-        )
-      }
       setSimulationStage("match")
 
       await wait(360)
       setReasoningStatus("loaded")
-      setAgentAnalysis(chatData.analysis ?? data.structuredAnalysis ?? null)
-      setAgentStages(chatData.stages ?? [])
+      setAgentAnalysis(data.structuredAnalysis ?? null)
+      setAgentStages([
+        { name: "input", status: "completed", summary: "Normalized active incident context." },
+        { name: "retrieval", status: "completed", summary: `Used ${matches.length} memory match(es).` },
+        { name: "reasoning", status: "completed", summary: "Generated the initial Kairo incident brief." },
+      ])
       setSimulationStage("action")
-      setAgentMessage({
-        id: `sim_${Date.now()}`,
-        role: "assistant",
-        content: chatData.response ?? data.analysis,
-        analysis: chatData.analysis ?? data.structuredAnalysis,
-        stages: chatData.stages,
-      })
+      await streamInitialAssistantBrief(incident, matches)
       setSimulationCounter((previous) => previous + 1)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to simulate incident"
