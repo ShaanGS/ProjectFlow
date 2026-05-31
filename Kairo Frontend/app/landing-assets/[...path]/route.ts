@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs"
 import { join, normalize } from "node:path"
 
+export const runtime = "nodejs"
+
 const CONTENT_TYPES: Record<string, string> = {
   css: "text/css; charset=utf-8",
   html: "text/html; charset=utf-8",

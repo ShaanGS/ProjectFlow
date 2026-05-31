@@ -3,6 +3,8 @@ import { join } from "node:path"
 
 import { NextResponse } from "next/server"
 
+export const runtime = "nodejs"
+
 function landingDist(path: string) {
   return join(process.cwd(), "landing", "Animated Website  copy", "dist", path)
 }
