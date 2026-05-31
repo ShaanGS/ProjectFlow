@@ -20,10 +20,14 @@ export function classifyChatIntent({
   return "general_question"
 }
 
-export function conversationalResponse(intent: ChatInteractionIntent) {
+export function conversationalResponse(intent: ChatInteractionIntent, hasActiveIncident = false) {
   if (intent === "greeting_or_smalltalk") {
-    return "Hi. I can help triage an active incident, inspect retrieved memory, or draft a response once there is incident context."
+    return hasActiveIncident
+      ? "Hi. I can help with this incident, the recalled memory, or next response steps."
+      : "Hi. I can help with Kairo setup, incident flow, or memory analysis."
   }
 
-  return "I can answer general Kairo questions here. For incident analysis, simulate an incident or describe the vendor, symptom, impact, and timing."
+  return hasActiveIncident
+    ? "I can help with this incident, memory evidence, or Kairo workflow."
+    : "I can help with Kairo setup, incident flow, or memory analysis. For incident analysis, share the vendor and symptom."
 }

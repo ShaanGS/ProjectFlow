@@ -186,7 +186,7 @@ Steps:
 1. [plain sentence]
 2. [plain sentence]
 3. [plain sentence]
-- End with one short follow-up line such as "Want me to draft this as a postmortem?" or "Should I check if this appeared on other vendors?"
+- End with one short follow-up line only when it naturally moves the incident forward. Do not mention postmortems unless the user asks for a report or the incident brief is ready for handoff.
 
 ${mode === "incident_brief"
   ? `Initial incident brief format:
@@ -340,7 +340,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          response: conversationalResponse(intent),
+          response: conversationalResponse(intent, hasActiveIncident),
           analysis: null,
           memoryMatches: 0,
           recalledIncidents: [],

@@ -183,8 +183,7 @@ function normalizeAssistantReply(content: string) {
           .slice(0, 3)
       : []
   const closing =
-    lines.find((line) => /^(Want me|Should I|Ask me)/i.test(line)) ??
-    "Want me to draft this as a postmortem?"
+    lines.find((line) => /^(Want me|Should I|Ask me)/i.test(line))
   const sectionLines = new Set(
     [matchFound, rootCause, resolution, recommendedNextStep, confidence, closing, "Steps:", ...steps]
       .filter(Boolean)
@@ -236,10 +235,13 @@ export function AgentChat({
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
+  const [postmortemDraftedIncidentId, setPostmortemDraftedIncidentId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const activeIncidentKey = activeIncident?.incident_id ?? null
 
   useEffect(() => {
     setMessages([])
+    setPostmortemDraftedIncidentId(null)
   }, [threadKey])
 
   useEffect(() => {
@@ -265,9 +267,24 @@ export function AgentChat({
     () => findIncidentBriefText(messages),
     [messages]
   )
+  const canDraftPostmortem = Boolean(
+    activeIncident &&
+      activeIncidentKey &&
+      memoryMatches.length > 0 &&
+      incidentBriefForExport &&
+      /Root cause:|Resolution used:|Recommended next step:|likely cause|recommended response/i.test(incidentBriefForExport)
+  )
+  const postmortemCtaVisible =
+    canDraftPostmortem && postmortemDraftedIncidentId !== activeIncidentKey
+  const latestAssistantMessageId = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].role === "assistant") return messages[index].id
+    }
+    return null
+  }, [messages])
 
   const handleExportPostMortem = useCallback(() => {
-    if (!incidentBriefForExport) return
+    if (!incidentBriefForExport || !activeIncidentKey) return
     const md = buildPostMortemMarkdown({
       activeIncident,
       analysis: agentAnalysis,
@@ -285,7 +302,16 @@ export function AgentChat({
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-  }, [activeIncident, agentAnalysis, incidentBriefForExport, memoryMatches])
+    setPostmortemDraftedIncidentId(activeIncidentKey)
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `postmortem_${Date.now()}`,
+        role: "assistant",
+        content: "Postmortem draft generated and downloaded. I used the active incident, recalled memory, likely cause, recommended response, and skipped checks.",
+      },
+    ])
+  }, [activeIncident, activeIncidentKey, agentAnalysis, incidentBriefForExport, memoryMatches])
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -302,6 +328,11 @@ export function AgentChat({
     setIsSending(true)
 
     try {
+      if (/draft\s+(a\s+)?postmortem|postmortem|incident report|report draft/i.test(userInput) && canDraftPostmortem) {
+        handleExportPostMortem()
+        return
+      }
+
       const historyPayload = nextMessages.map(({ role, content }) => ({
         role,
         content,
@@ -408,37 +439,6 @@ export function AgentChat({
 
   return (
     <div className="flex h-full flex-col bg-white font-sans antialiased">
-      {messages.length > 0 && (
-        <div className="flex shrink-0 justify-end border-b border-gray-100 bg-[#FAFAFA] px-6 py-3">
-          <button
-            type="button"
-            onClick={handleExportPostMortem}
-            disabled={!incidentBriefForExport}
-            title={
-              incidentBriefForExport
-                ? "Download post-mortem as Markdown"
-                : "Run an incident brief first (e.g. ask about boundary / resolution)"
-            }
-            className={cn(
-              "group inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2.5 sm:w-auto sm:min-w-[10.5rem]",
-              "text-[13px] font-semibold tracking-[-0.01em] text-gray-900 shadow-sm",
-              "transition-all duration-200",
-              "hover:border-teal-200 hover:bg-teal-50 hover:shadow-md",
-              "active:scale-[0.99]",
-              "disabled:pointer-events-none disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-400 disabled:opacity-45 disabled:shadow-none"
-            )}
-          >
-            <FileDown className="h-3.5 w-3.5 text-gray-500" strokeWidth={2} aria-hidden />
-            <span>Export Postmortem</span>
-            <FileDown
-              className="hidden h-3.5 w-3.5 text-gray-400 transition-colors group-hover:text-teal-600 group-disabled:group-hover:text-gray-400"
-              strokeWidth={2}
-              aria-hidden
-            />
-          </button>
-        </div>
-      )}
-
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
@@ -515,7 +515,15 @@ export function AgentChat({
                 )}
                 {!message.analysis && (
                   message.role === "assistant" ? (
-                    <AssistantReply content={message.content} />
+                    <AssistantReply
+                      content={message.content}
+                      showPostmortemCta={
+                        postmortemCtaVisible &&
+                        message.id === latestAssistantMessageId &&
+                        /Root cause:|Resolution used:|Recommended next step:|Ask me anything.*draft postmortem/i.test(message.content)
+                      }
+                      onDraftPostmortem={handleExportPostMortem}
+                    />
                   ) : (
                     <div className="kairo-message-in max-w-[82%] whitespace-pre-wrap rounded-[18px_18px_4px_18px] border border-gray-800 bg-gray-900 px-5 py-4 text-[15px] leading-7 text-white shadow-sm">
                       {message.content}
@@ -562,7 +570,15 @@ export function AgentChat({
   )
 }
 
-function AssistantReply({ content }: { content: string }) {
+function AssistantReply({
+  content,
+  showPostmortemCta = false,
+  onDraftPostmortem,
+}: {
+  content: string
+  showPostmortemCta?: boolean
+  onDraftPostmortem?: () => void
+}) {
   const reply = normalizeAssistantReply(content)
 
   if (!reply.fallback) {
@@ -644,9 +660,27 @@ function AssistantReply({ content }: { content: string }) {
           </div>
         )}
       </div>
-      <div className="border-t border-slate-100 px-5 py-3">
-        <p className="text-[13px] font-medium leading-6 text-slate-500">{reply.closing}</p>
-      </div>
+      {(reply.closing || showPostmortemCta) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-2.5">
+          {reply.closing ? (
+            <p className="text-[13px] font-medium leading-6 text-slate-500">{reply.closing}</p>
+          ) : (
+            <p className="text-[13px] font-medium leading-6 text-slate-500">
+              Ready to turn this into a postmortem.
+            </p>
+          )}
+          {showPostmortemCta && (
+            <button
+              type="button"
+              onClick={onDraftPostmortem}
+              className="inline-flex items-center gap-2 rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-[12px] font-semibold text-teal-800 transition-colors hover:bg-teal-100"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              Draft postmortem
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

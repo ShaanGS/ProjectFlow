@@ -6,9 +6,9 @@ export const metadata: Metadata = {
   title: "Kairo - Institutional Memory for On-Call Engineers",
   description: "Memory-backed incident intelligence for vendor failures.",
   icons: {
-    icon: "/new favicon.svg",
-    shortcut: "/new favicon.svg",
-    apple: "/new favicon.svg",
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
   },
 }
 
