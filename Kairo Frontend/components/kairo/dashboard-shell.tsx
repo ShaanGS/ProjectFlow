@@ -583,7 +583,7 @@ export function DashboardShell() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-white font-sans text-[15px] leading-[1.5] antialiased">
+    <div className="flex h-screen w-full bg-white font-sans text-[16px] leading-[1.5] antialiased">
       {/* Left Navigation */}
       <LeftNav
         activePage={activePage}

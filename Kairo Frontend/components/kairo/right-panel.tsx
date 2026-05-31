@@ -35,8 +35,8 @@ export function RightPanel({
   const showAction = simulationStage === "action"
 
   return (
-    <aside className="hidden h-full w-[320px] min-w-[320px] flex-col border-l border-gray-100 bg-[#FBFBFC] xl:flex">
-      <div className="border-b border-gray-100 bg-white px-6 py-5">
+    <aside className="hidden h-full w-[300px] min-w-[300px] flex-col border-l border-gray-100 bg-[#FBFBFC] xl:flex">
+      <div className="shrink-0 border-b border-gray-100 bg-white px-5 py-5">
         <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-gray-400">
           Intelligence Rail
         </p>
@@ -45,91 +45,95 @@ export function RightPanel({
         </h2>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-5">
-        <RailCard
-          icon={Network}
-          label="Memory summary"
-          status={memoryStatus}
-          title={
-            simulationStage === "processing"
-              ? "Processing alert"
-              : activeIncident && showMemorySummary
-              ? `${memoryMatches.length} historical ${memoryMatches.length === 1 ? "match" : "matches"}`
-              : "No active incident"
-          }
-          body={
-            memoryStatus === "loading"
-              ? "Recalling similar vendor failures."
-              : memoryStatus === "error"
-                ? "Retrieval failed. Open the console to continue manually."
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="flex flex-col gap-3">
+          <RailCard
+            icon={Network}
+            label="Memory summary"
+            status={memoryStatus}
+            title={
+              simulationStage === "processing"
+                ? "Processing alert"
                 : activeIncident && showMemorySummary
-                  ? "Retrieved evidence is ready for analysis."
-                  : simulationStage === "processing"
-                    ? "Normalizing the incoming incident before recall."
+                ? `${memoryMatches.length} historical ${memoryMatches.length === 1 ? "match" : "matches"}`
+                : "No active incident"
+            }
+            body={
+              memoryStatus === "loading"
+                ? "Recalling similar vendor failures."
+                : memoryStatus === "error"
+                  ? "Retrieval failed. Open the console to continue manually."
+                  : activeIncident && showMemorySummary
+                    ? "Retrieved evidence is ready for analysis."
+                    : simulationStage === "processing"
+                      ? "Normalizing the incoming incident before recall."
+                      : activeIncident
+                        ? "Incident captured. Memory recall is next."
+                        : "Simulate or select an incident to start recall."
+            }
+            active={simulationStage === "processing" || showMemorySummary}
+          />
+
+          <RailCard
+            icon={CheckCircle2}
+            label="Top recalled match"
+            status={topMatch ? "linked" : memoryStatus}
+            title={showTopMatch ? topMatchTitle ?? "No match selected" : "Awaiting best match"}
+            body={
+              showTopMatch && topMatch
+                ? `${topMatchVendor ?? "Unknown vendor"} · ${
+                    typeof topMatch.similarity === "number"
+                      ? `${formatEvidenceStrength(topMatch.similarity)} evidence`
+                      : "memory evidence"
+                  }`
+                : "Kairo will surface the strongest memory after recall completes."
+            }
+            active={showTopMatch}
+          />
+
+          <RailCard
+            icon={Brain}
+            label="Likely cause preview"
+            status={reasoningStatus}
+            title={showAction ? agentAnalysis?.likely_cause ?? "Awaiting Kairo analysis" : "Analysis pending"}
+            body={
+              reasoningStatus === "loading"
+                ? "Matching evidence and preparing an action plan."
+                : reasoningStatus === "error"
+                  ? "Analysis failed. The incident workspace remains usable."
+                  : activeIncident && showAction
+                    ? "Grounded in recalled incident memory."
                     : activeIncident
-                      ? "Incident captured. Memory recall is next."
-                      : "Simulate or select an incident to start recall."
-          }
-          active={simulationStage === "processing" || showMemorySummary}
-        />
+                      ? "Suggested cause appears after evidence is matched."
+                      : "No incident context is active."
+            }
+            active={showAction}
+          />
 
-        <RailCard
-          icon={CheckCircle2}
-          label="Top recalled match"
-          status={topMatch ? "linked" : memoryStatus}
-          title={showTopMatch ? topMatchTitle ?? "No match selected" : "Awaiting best match"}
-          body={
-            showTopMatch && topMatch
-              ? `${topMatchVendor ?? "Unknown vendor"} · ${
-                  typeof topMatch.similarity === "number"
-                    ? `${formatEvidenceStrength(topMatch.similarity)} evidence`
-                    : "memory evidence"
-                }`
-              : "Kairo will surface the strongest memory after recall completes."
-          }
-          active={showTopMatch}
-        />
-
-        <RailCard
-          icon={Brain}
-          label="Likely cause preview"
-          status={reasoningStatus}
-          title={showAction ? agentAnalysis?.likely_cause ?? "Awaiting Kairo analysis" : "Analysis pending"}
-          body={
-            reasoningStatus === "loading"
-              ? "Matching evidence and preparing an action plan."
-              : reasoningStatus === "error"
-                ? "Analysis failed. The incident workspace remains usable."
-                : activeIncident && showAction
-                  ? "Grounded in recalled incident memory."
-                  : activeIncident
-                    ? "Suggested cause appears after evidence is matched."
-                    : "No incident context is active."
-          }
-          active={showAction}
-        />
-
-        <section className={[
-          "rounded-xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-500",
-          showAction ? "kairo-stage-in opacity-100" : "opacity-65",
-        ].join(" ")}>
-          <div className="mb-3 flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-teal-700" />
-            <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-gray-500">
-              Suggested action
+          <section className={[
+            "kairo-hover-card rounded-lg border border-gray-100 bg-white p-4 shadow-sm transition-all duration-500",
+            showAction ? "kairo-stage-in opacity-100" : "opacity-65",
+          ].join(" ")}>
+            <div className="mb-2 flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-teal-700" />
+              <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-gray-500">
+                Suggested action
+              </p>
+            </div>
+            <p className="line-clamp-4 text-[14px] font-semibold leading-6 text-gray-950">
+              {showAction
+                ? suggestedAction ?? "Open Kairo Console to inspect memory, ask follow-ups, or export a postmortem."
+                : "Action plan appears after Kairo finishes evidence matching."}
             </p>
-          </div>
-          <p className="line-clamp-5 text-[15px] font-semibold leading-6 text-gray-950">
-            {showAction
-              ? suggestedAction ?? "Open Kairo Console to inspect memory, ask follow-ups, or export a postmortem."
-              : "Action plan appears after Kairo finishes evidence matching."}
-          </p>
-        </section>
+          </section>
+        </div>
+      </div>
 
+      <div className="shrink-0 border-t border-gray-100 bg-white p-4">
         <button
           type="button"
           onClick={onOpenConsole}
-          className="mt-auto flex w-full items-center justify-between rounded-xl bg-gray-950 px-4 py-3 text-left text-white shadow-sm transition-all hover:bg-gray-800"
+          className="flex w-full items-center justify-between rounded-xl bg-gray-950 px-4 py-3 text-left text-white shadow-sm transition-all hover:bg-gray-800"
         >
           <span>
             <span className="block text-[14px] font-bold">Open Kairo Console</span>
@@ -167,7 +171,7 @@ function RailCard({
 }) {
   return (
     <section className={[
-      "rounded-xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-500",
+      "kairo-hover-card rounded-lg border border-gray-100 bg-white p-4 shadow-sm transition-all duration-500",
       active ? "kairo-stage-in opacity-100" : "opacity-65",
     ].join(" ")}>
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -181,8 +185,8 @@ function RailCard({
           {status}
         </span>
       </div>
-      <p className="line-clamp-3 text-[15px] font-bold leading-6 text-gray-950">{title}</p>
-      <p className="mt-2 line-clamp-4 text-[14px] leading-6 text-gray-500">{body}</p>
+      <p className="line-clamp-2 text-[14px] font-bold leading-6 text-gray-950">{title}</p>
+      <p className="mt-2 line-clamp-3 text-[13px] leading-5 text-gray-500">{body}</p>
     </section>
   )
 }

@@ -56,8 +56,8 @@ export function LeftNav({
                 className={cn(
                   "group flex w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left transition-all duration-200",
                   isActive
-                    ? "bg-gray-900 text-[13px] font-medium text-white shadow-md shadow-gray-900/10"
-                    : "text-[13px] font-medium text-gray-500 hover:bg-gray-200/50 hover:text-gray-900"
+                    ? "translate-x-0.5 bg-gray-900 text-[13px] font-medium text-white shadow-md shadow-gray-900/10"
+                    : "text-[13px] font-medium text-gray-500 hover:translate-x-0.5 hover:bg-gray-200/50 hover:text-gray-900"
                 )}
               >
                 <Icon
@@ -98,8 +98,8 @@ export function LeftNav({
                 className={cn(
                   "flex w-full items-center gap-3 rounded-[8px] px-4 py-2 text-left transition-all duration-200",
                   isActive
-                    ? "bg-gray-900 text-[13px] font-medium text-white shadow-md shadow-gray-900/10"
-                    : "text-[13px] font-medium text-gray-500 hover:bg-gray-200/50 hover:text-gray-900"
+                    ? "translate-x-0.5 bg-gray-900 text-[13px] font-medium text-white shadow-md shadow-gray-900/10"
+                    : "text-[13px] font-medium text-gray-500 hover:translate-x-0.5 hover:bg-gray-200/50 hover:text-gray-900"
                 )}
               >
                 <span>{vendor.label}</span>

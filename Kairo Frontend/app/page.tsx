@@ -1,21 +1,25 @@
 "use client"
 
 import { useEffect } from "react"
-import { DashboardShell } from "@/components/kairo/dashboard-shell"
 
-export default function KairoPage() {
+export default function HomePage() {
   useEffect(() => {
-    const seeded = localStorage.getItem("kairo_seeded")
-
-    if (!seeded) {
-      fetch("/api/seed", { method: "POST" })
-        .then((response) => response.json())
-        .then((payload) => {
-          if (payload.success) localStorage.setItem("kairo_seeded", "true")
-        })
-        .catch(console.error)
+    function handleLandingMessage(event: MessageEvent) {
+      if (event.data?.type === "kairo:open-product") {
+        window.location.assign("/kairo")
+      }
     }
+
+    window.addEventListener("message", handleLandingMessage)
+    return () => window.removeEventListener("message", handleLandingMessage)
   }, [])
 
-  return <DashboardShell />
+  return (
+    <iframe
+      title="Kairo landing page"
+      src="/landing-embed"
+      className="block h-screen w-full border-0"
+      sandbox="allow-scripts allow-same-origin allow-top-navigation-by-user-activation"
+    />
+  )
 }

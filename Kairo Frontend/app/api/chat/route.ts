@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { classifyChatIntent, conversationalResponse } from "@/lib/agent/intent"
-import { runKairoAgent } from "@/lib/agent/runtime"
-import "@/lib/config/env"
+import { kairoConfig } from "@/lib/config/env"
+import groq from "@/lib/groq"
 import type { ActiveIncidentContext, RetrievedMemoryIncident } from "@/types/agent"
 
 type ChatTurn = { role: "user" | "assistant"; content: string }
@@ -65,6 +65,146 @@ function normalizeMemoryMatches(body: Record<string, unknown>) {
   })
 }
 
+function field(value: unknown, fallback = "unknown") {
+  if (typeof value === "string" && value.trim()) return value.trim()
+  if (typeof value === "number") return String(value)
+  return fallback
+}
+
+function buildSystemPrompt(
+  currentIncident: ActiveIncidentContext,
+  pastEpisodes: RetrievedMemoryIncident[]
+) {
+  const topMatch = pastEpisodes[0]
+
+  return `You are Kairo, an SRE incident intelligence assistant. You are helping an engineer handle an active incident in real time.
+
+Active Incident:
+- Title: ${field(currentIncident.title)}
+- Vendor: ${field(currentIncident.vendor)}
+- Severity: ${field(currentIncident.severity)}
+- Region: ${field(currentIncident.region)}
+- Description: ${field(currentIncident.description ?? currentIncident.customer_impact)}
+- Customer Impact: ${field(currentIncident.customer_impact)}
+
+Top Memory Match (most similar past incident):
+- Title: ${field(topMatch?.title)}
+- Root Cause: ${field(topMatch?.root_cause)}
+- Resolution: ${field(topMatch?.resolution)}
+- Similarity: ${field(topMatch?.similarity)}
+
+Instructions:
+- Answer only based on the context above
+- Be concise, direct, and structured
+- If the user asks for the cause, explain the root cause from memory
+- If the user asks what to do, give the resolution steps from memory
+- If the user asks something outside this context, say "I don't have enough context for that in this incident"
+- Never hallucinate actions or causes not present in the memory match
+- Do not include chain-of-thought, hidden reasoning, or <think> blocks`
+}
+
+function groqMessages(systemPrompt: string, chatMessages: ChatTurn[]) {
+  return [
+    { role: "system" as const, content: systemPrompt },
+    ...chatMessages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
+  ]
+}
+
+async function streamGroqResponse(systemPrompt: string, chatMessages: ChatTurn[]) {
+  const completion = await groq.chat.completions.create({
+    model: kairoConfig.groqModel,
+    messages: groqMessages(systemPrompt, chatMessages),
+    temperature: 0.2,
+    max_completion_tokens: 700,
+    stream: true,
+  })
+
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream({
+    async start(controller) {
+      let buffer = ""
+      let insideThinkBlock = false
+
+      const filterHiddenReasoning = (input: string, flush = false) => {
+        buffer += input
+        let output = ""
+
+        while (buffer.length) {
+          if (insideThinkBlock) {
+            const end = buffer.indexOf("</think>")
+            if (end === -1) {
+              buffer = buffer.slice(-7)
+              return output
+            }
+            buffer = buffer.slice(end + "</think>".length)
+            insideThinkBlock = false
+            continue
+          }
+
+          const start = buffer.indexOf("<think>")
+          if (start === -1) {
+            if (flush) {
+              output += buffer
+              buffer = ""
+              return output
+            }
+            const safeLength = Math.max(0, buffer.length - "<think>".length)
+            output += buffer.slice(0, safeLength)
+            buffer = buffer.slice(safeLength)
+            return output
+          }
+
+          output += buffer.slice(0, start)
+          buffer = buffer.slice(start + "<think>".length)
+          insideThinkBlock = true
+        }
+
+        return output
+      }
+
+      try {
+        for await (const chunk of completion) {
+          const token = chunk.choices[0]?.delta?.content ?? ""
+          const visibleToken = token ? filterHiddenReasoning(token) : ""
+          if (visibleToken) controller.enqueue(encoder.encode(visibleToken))
+        }
+        const tail = filterHiddenReasoning("", true).trimStart()
+        if (tail) {
+          controller.enqueue(encoder.encode(tail))
+        }
+        controller.close()
+      } catch (error) {
+        controller.error(error)
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Kairo-Stream": "true",
+    },
+  })
+}
+
+async function completeGroqResponse(systemPrompt: string, chatMessages: ChatTurn[]) {
+  const completion = await groq.chat.completions.create({
+    model: kairoConfig.groqModel,
+    messages: groqMessages(systemPrompt, chatMessages),
+    temperature: 0.2,
+    max_completion_tokens: 700,
+  })
+
+  const content = completion.choices[0]?.message?.content ?? ""
+  const visibleContent = content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
+
+  return visibleContent || "I don't have enough context for that in this incident"
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Record<string, unknown>
@@ -103,14 +243,43 @@ export async function POST(req: NextRequest) {
     }
 
     const activeIncident = activeIncidentFromBody(body, latestUserMessage)
+    const systemPrompt = buildSystemPrompt(activeIncident, retrievedMemory)
 
-    const result = runKairoAgent({
-      activeIncident,
-      retrievedMemory,
-      latestUserMessage,
+    if (body.stream === true) {
+      return streamGroqResponse(systemPrompt, chatMessages)
+    }
+
+    const response = await completeGroqResponse(systemPrompt, chatMessages)
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        response,
+        analysis: null,
+        memoryMatches: retrievedMemory.length,
+        recalledIncidents: retrievedMemory,
+        intent,
+        stages: [
+          {
+            name: "input",
+            status: "completed",
+            summary: "Normalized active incident context.",
+          },
+          {
+            name: "retrieval",
+            status: retrievedMemory.length ? "completed" : "skipped",
+            summary: retrievedMemory.length
+              ? `Used ${retrievedMemory.length} memory match(es).`
+              : "No memory matches were provided.",
+          },
+          {
+            name: "reasoning",
+            status: "completed",
+            summary: "Generated a Groq-grounded response.",
+          },
+        ],
+      },
     })
-
-    return NextResponse.json({ success: true, data: { ...result, intent } })
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Chat request failed"
     return NextResponse.json(

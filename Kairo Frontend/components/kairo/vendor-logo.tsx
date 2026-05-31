@@ -1,49 +1,58 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import {
+  Building2,
+  Cloud,
+  CreditCard,
+  Landmark,
+  MessageCircle,
+  MessageSquareText,
+  type LucideIcon,
+} from "lucide-react"
 
-const vendorStyles: Record<string, { label: string; logo: string; bgColor: string; bgClassName: string }> = {
+const vendorStyles: Record<string, { label: string; icon: LucideIcon; bgClassName: string; iconClassName: string }> = {
   razorpay: {
     label: "Razorpay",
-    logo: "/logos/razorpay.svg",
-    bgColor: "#116DFF",
     bgClassName: "bg-[#EAF2FF] ring-[#116DFF]/15",
+    iconClassName: "text-[#116DFF]",
+    icon: CreditCard,
   },
   msg91: {
     label: "MSG91",
-    logo: "/logos/msg91.svg",
-    bgColor: "#E94B22",
     bgClassName: "bg-[#FFF0EA] ring-[#E94B22]/15",
+    iconClassName: "text-[#E94B22]",
+    icon: MessageSquareText,
   },
   "aws-s3": {
     label: "AWS S3",
-    logo: "/logos/aws-s3.svg",
-    bgColor: "#FF9900",
     bgClassName: "bg-[#FFF7E6] ring-[#FF9900]/20",
+    iconClassName: "text-[#B45309]",
+    icon: Cloud,
   },
   cashfree: {
     label: "Cashfree",
-    logo: "/logos/cashfree.svg",
-    bgColor: "#16A34A",
     bgClassName: "bg-[#F0FFF4] ring-[#16A34A]/15",
+    iconClassName: "text-[#16A34A]",
+    icon: Landmark,
   },
   internal: {
     label: "Internal",
-    logo: "/logos/internal.svg",
-    bgColor: "#52525B",
     bgClassName: "bg-[#F4F4F5] ring-[#71717A]/15",
+    iconClassName: "text-[#52525B]",
+    icon: Building2,
   },
   auth0: {
     label: "Auth0",
-    logo: "/logos/auth0.svg",
-    bgColor: "#EB5424",
     bgClassName: "bg-[#FFF4ED] ring-[#EB5424]/15",
+    iconClassName: "text-[#EB5424]",
+    icon: Building2,
   },
   whatsapp: {
     label: "WhatsApp",
-    logo: "/logos/whatsapp.svg",
-    bgColor: "#12B76A",
     bgClassName: "bg-[#ECFDF3] ring-[#12B76A]/15",
+    iconClassName: "text-[#12B76A]",
+    icon: MessageCircle,
   },
 }
 
@@ -77,25 +86,23 @@ export function VendorLogo({
     md: "h-9 w-9",
     lg: "h-11 w-11",
   }[size]
+  const iconSizeClass = {
+    sm: "h-4 w-4",
+    md: "h-5 w-5",
+    lg: "h-6 w-6",
+  }[size]
+  const Icon = style.icon
 
   return (
     <span className="inline-flex items-center gap-2">
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-xl ring-1 overflow-hidden",
+          "inline-flex shrink-0 items-center justify-center rounded-xl ring-1",
           sizeClass,
           style.bgClassName
         )}
       >
-        <img
-          src={style.logo}
-          alt={style.label}
-          className="h-full w-full object-contain p-1"
-          onError={(e) => {
-            // Fallback: if logo fails to load, show a solid color circle
-            (e.target as HTMLImageElement).style.display = 'none'
-          }}
-        />
+        <Icon className={cn(iconSizeClass, style.iconClassName)} strokeWidth={2} aria-hidden />
       </span>
       {showLabel && <span className="text-[13px] font-semibold text-gray-900">{style.label}</span>}
     </span>
@@ -106,11 +113,10 @@ export function KairoLogoMark({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center", className)}>
       <img
-        src="/kairo-logo.png"
+        src="/new logo.svg"
         alt="Kairo"
-        className="w-44 h-auto object-contain object-left"
+        className="h-auto w-40 object-contain object-left"
       />
     </span>
   )
 }
-

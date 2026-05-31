@@ -142,3 +142,55 @@
 .kairo-stage-in {
   animation: kairo-stage-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+@keyframes kairo-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes kairo-console-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.kairo-message-in {
+  animation: kairo-message-in 220ms ease-out both;
+}
+
+.kairo-console-panel {
+  animation: kairo-console-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.kairo-hover-card {
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.kairo-hover-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kairo-stage-in,
+  .kairo-message-in,
+  .kairo-console-panel {
+    animation: none;
+  }
+
+  .kairo-hover-card,
+  .kairo-console-panel {
+    transition: none;
+  }
+}

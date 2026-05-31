@@ -147,6 +147,31 @@ const suggestionCards = [
   },
 ]
 
+function stripHiddenReasoning(content: string) {
+  return content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim()
+}
+
+function normalizeAssistantReply(content: string) {
+  const clean = stripHiddenReasoning(content)
+  const lines = clean
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-*]\s*/, "").trim())
+    .filter(Boolean)
+
+  const likelyCause = lines.find((line) => /cause|root cause|degradation|gateway|timeout/i.test(line))
+  const recommendedAction = lines.find((line) => /recommend|action|resolution|resolve|fail over|monitor|check|skip/i.test(line))
+  const evidence = lines.find((line) => /evidence|memory|similar|match|aligns|based on/i.test(line))
+  const opening = lines.find((line) => line !== likelyCause && line !== recommendedAction && line !== evidence) ?? clean
+
+  return {
+    opening: opening || "Here is the incident guidance from the retrieved memory.",
+    likelyCause,
+    recommendedAction,
+    evidence,
+    fallback: clean,
+  }
+}
+
 interface AgentChatProps {
   activeIncident: ApiIncident | null
   injectedMessage: Message | null
@@ -243,15 +268,68 @@ export function AgentChat({
           currentIncident: activeIncident,
           // Forward the retrieved memory matches so follow-up chats stay grounded
           past_episodes: memoryMatches.length > 0 ? memoryMatches : undefined,
+          stream: true,
         }),
       })
-      const payload = await response.json()
 
-      if (!response.ok || !payload.success) {
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.error ?? "analysis failed")
+      }
+
+      const isStreamingResponse = response.headers.get("X-Kairo-Stream") === "true"
+      if (isStreamingResponse) {
+        const assistantId = (Date.now() + 1).toString()
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+          },
+        ])
+
+        if (!response.body) {
+          throw new Error("stream unavailable")
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let streamedContent = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          streamedContent += decoder.decode(value, { stream: true })
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId
+                ? { ...message, content: streamedContent }
+                : message
+            )
+          )
+        }
+
+        const finalChunk = decoder.decode()
+        if (finalChunk) {
+          streamedContent += finalChunk
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId
+                ? { ...message, content: streamedContent }
+                : message
+            )
+          )
+        }
+        return
+      }
+
+      const payload = await response.json()
+      if (!payload.success) {
         throw new Error(payload.error ?? "analysis failed")
       }
-      const data = payload.data
 
+      const data = payload.data
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -282,54 +360,36 @@ export function AgentChat({
 
   return (
     <div className="flex h-full flex-col bg-white font-sans antialiased">
-      {/* Header */}
-      <div className="border-b border-gray-100 bg-[#FAFAFA] px-7 py-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <img src="/icon.svg" alt="Kairo Icon" className="h-8 w-8 shrink-0 object-contain" />
-            <div className="min-w-0">
-              <h3 className="text-[20px] font-bold leading-tight tracking-tight text-gray-900">
-                Kairo Agent
-              </h3>
-              <p className="text-[13px] leading-5 text-gray-500">memory copilot</p>
-            </div>
-          </div>
-          <div
-            className="h-2 w-2 shrink-0 rounded-full bg-teal-600 shadow-[0_0_0_4px_rgba(13,148,136,0.12)]"
-            aria-hidden
-          />
+      {messages.length > 0 && (
+        <div className="flex shrink-0 justify-end border-b border-gray-100 bg-[#FAFAFA] px-6 py-3">
+          <button
+            type="button"
+            onClick={handleExportPostMortem}
+            disabled={!incidentBriefForExport}
+            title={
+              incidentBriefForExport
+                ? "Download post-mortem as Markdown"
+                : "Run an incident brief first (e.g. ask about boundary / resolution)"
+            }
+            className={cn(
+              "group inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2.5 sm:w-auto sm:min-w-[10.5rem]",
+              "text-[13px] font-semibold tracking-[-0.01em] text-gray-900 shadow-sm",
+              "transition-all duration-200",
+              "hover:border-teal-200 hover:bg-teal-50 hover:shadow-md",
+              "active:scale-[0.99]",
+              "disabled:pointer-events-none disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-400 disabled:opacity-45 disabled:shadow-none"
+            )}
+          >
+            <FileDown className="h-3.5 w-3.5 text-gray-500" strokeWidth={2} aria-hidden />
+            <span>Export Postmortem</span>
+            <FileDown
+              className="hidden h-3.5 w-3.5 text-gray-400 transition-colors group-hover:text-teal-600 group-disabled:group-hover:text-gray-400"
+              strokeWidth={2}
+              aria-hidden
+            />
+          </button>
         </div>
-        {messages.length > 0 && (
-          <div className="mt-4 flex justify-stretch sm:justify-end">
-            <button
-              type="button"
-              onClick={handleExportPostMortem}
-              disabled={!incidentBriefForExport}
-              title={
-                incidentBriefForExport
-                  ? "Download post-mortem as Markdown"
-                  : "Run an incident brief first (e.g. ask about boundary / resolution)"
-              }
-              className={cn(
-                "group inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2.5 sm:w-auto sm:min-w-[10.5rem]",
-                "text-[13px] font-semibold tracking-[-0.01em] text-gray-900 shadow-sm",
-                "transition-all duration-200",
-                "hover:border-teal-200 hover:bg-teal-50 hover:shadow-md",
-                "active:scale-[0.99]",
-                "disabled:pointer-events-none disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-400 disabled:opacity-45 disabled:shadow-none"
-              )}
-            >
-              <FileDown className="h-3.5 w-3.5 text-gray-500" strokeWidth={2} aria-hidden />
-              <span>Export Postmortem</span>
-              <FileDown
-                className="hidden h-3.5 w-3.5 text-gray-400 transition-colors group-hover:text-teal-600 group-disabled:group-hover:text-gray-400"
-                strokeWidth={2}
-                aria-hidden
-              />
-            </button>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto">
@@ -337,7 +397,7 @@ export function AgentChat({
           <div className="flex h-full flex-col items-center justify-center px-4">
             {/* Empty State Icon */}
             <div className="mb-6">
-              <img src="/kairo-logo.png" alt="Kairo" className="w-36 h-auto object-contain" />
+              <img src="/new logo.svg" alt="Kairo" className="h-auto w-32 object-contain" />
             </div>
 
             <p className="mb-8 max-w-[280px] text-center text-[15px] leading-6 text-gray-500">
@@ -406,16 +466,13 @@ export function AgentChat({
                   <StructuredReasoning analysis={message.analysis} memoryMatches={memoryMatches} />
                 )}
                 {!message.analysis && (
-                  <div
-                    className={cn(
-                      "whitespace-pre-wrap px-5 py-4 text-[15px] leading-7 shadow-sm",
-                      message.role === "user"
-                        ? "max-w-[82%] rounded-[18px_18px_4px_18px] border border-gray-800 bg-gray-900 text-white"
-                        : "w-full rounded-lg border border-gray-100 bg-white text-gray-900"
-                    )}
-                  >
-                    {message.content}
-                  </div>
+                  message.role === "assistant" ? (
+                    <AssistantReply content={message.content} />
+                  ) : (
+                    <div className="kairo-message-in max-w-[82%] whitespace-pre-wrap rounded-[18px_18px_4px_18px] border border-gray-800 bg-gray-900 px-5 py-4 text-[15px] leading-7 text-white shadow-sm">
+                      {message.content}
+                    </div>
+                  )
                 )}
               </div>
             ))}
@@ -453,6 +510,59 @@ export function AgentChat({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function AssistantReply({ content }: { content: string }) {
+  const reply = normalizeAssistantReply(content)
+
+  if (!reply.fallback) {
+    return (
+      <div className="kairo-message-in w-full rounded-lg border border-gray-100 bg-white px-5 py-4 text-[15px] leading-7 text-gray-500 shadow-sm">
+        Kairo is preparing a grounded response...
+      </div>
+    )
+  }
+
+  if (/^Kairo request failed:/i.test(reply.fallback)) {
+    return (
+      <div className="kairo-message-in w-full rounded-lg border border-red-100 bg-red-50 px-5 py-4 text-[15px] font-medium leading-7 text-red-700 shadow-sm">
+        {reply.fallback}
+      </div>
+    )
+  }
+
+  return (
+    <div className="kairo-message-in w-full rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-teal-600 shadow-[0_0_0_4px_rgba(13,148,136,0.12)]" />
+        <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-gray-500">
+          SRE guidance
+        </p>
+      </div>
+      <p className="text-[15px] font-medium leading-7 text-gray-800">{reply.opening}</p>
+
+      <div className="mt-4 grid gap-3">
+        {reply.likelyCause && (
+          <ReplySection title="Likely cause">{reply.likelyCause}</ReplySection>
+        )}
+        {reply.recommendedAction && reply.recommendedAction !== reply.likelyCause && (
+          <ReplySection title="Recommended action">{reply.recommendedAction}</ReplySection>
+        )}
+        {reply.evidence && reply.evidence !== reply.likelyCause && reply.evidence !== reply.recommendedAction && (
+          <ReplySection title="Evidence">{reply.evidence}</ReplySection>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ReplySection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">{title}</p>
+      <p className="mt-1 text-[14px] leading-6 text-gray-700">{children}</p>
     </div>
   )
 }

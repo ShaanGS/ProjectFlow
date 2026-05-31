@@ -43,9 +43,9 @@ export function LiveIncidentsPage({
   const activePriority = getPriorityFromSeverity(activeIncident?.severity)
 
   return (
-    <div className="min-w-0 flex-1 overflow-y-auto bg-white">
+    <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
       {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-5 border-b border-gray-100 bg-white px-8 py-6">
+      <div className="grid shrink-0 grid-cols-3 gap-5 border-b border-gray-100 bg-white px-8 py-6">
         <StatBlock
           label="MEMORY RECALL HITS"
           value={memoryStatus === "loading" ? "…" : String(memoryHits)}
@@ -64,7 +64,7 @@ export function LiveIncidentsPage({
       </div>
 
       {simulationStage === "processing" && (
-        <div className="kairo-stage-in border-b border-gray-100 bg-[#FAFAFA] px-8 py-6">
+        <div className="kairo-stage-in shrink-0 border-b border-gray-100 bg-[#FAFAFA] px-8 py-6">
           <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
             <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-teal-700">
               Processing alert
@@ -80,7 +80,7 @@ export function LiveIncidentsPage({
       )}
 
       {activeIncident && (
-        <div className="kairo-stage-in border-b border-gray-100 bg-[#FAFAFA] px-8 py-6">
+        <div className="kairo-stage-in shrink-0 border-b border-gray-100 bg-[#FAFAFA] px-8 py-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-teal-700">
@@ -109,14 +109,14 @@ export function LiveIncidentsPage({
       )}
 
       {flowError && (
-        <div className="border-b border-red-100 bg-red-50 px-8 py-3 text-[13px] font-semibold text-red-700">
+        <div className="shrink-0 border-b border-red-100 bg-red-50 px-8 py-3 text-[13px] font-semibold text-red-700">
           {flowError}
         </div>
       )}
 
       {/* Incident Tables */}
-      <div className="flex-1">
-        <div className="flex items-center gap-3 px-8 py-5">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center gap-3 px-8 py-5">
           <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-gray-500">
             live incident queue
           </span>
@@ -131,22 +131,24 @@ export function LiveIncidentsPage({
         />
         
         {/* Resolved divider */}
-        <div className="flex items-center gap-3 border-t border-gray-100 px-8 py-6">
+        <div className="flex shrink-0 items-center gap-3 border-t border-gray-100 px-8 py-6">
           <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-gray-500">
             memory corpus / resolved history
           </span>
           <div className="flex-1 h-px bg-gray-100" />
         </div>
         
-        <IncidentTable
-          incidents={resolvedIncidents}
-          isResolved
-          listStatus={incidentListStatus}
-          listError={incidentListError}
-          onSelectIncident={onSelectIncident}
-          onResolveIncident={onResolveIncident}
-          resolvingIncidentId={resolvingIncidentId}
-        />
+        <div className="min-h-[220px] flex-1 overflow-y-auto overscroll-contain [max-height:min(42vh,520px)]">
+          <IncidentTable
+            incidents={resolvedIncidents}
+            isResolved
+            listStatus={incidentListStatus}
+            listError={incidentListError}
+            onSelectIncident={onSelectIncident}
+            onResolveIncident={onResolveIncident}
+            resolvingIncidentId={resolvingIncidentId}
+          />
+        </div>
       </div>
     </div>
   )
@@ -162,7 +164,7 @@ function StatBlock({
   subtitle: string
 }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+    <div className="kairo-hover-card rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
       <p className="min-h-[30px] text-[12px] font-semibold uppercase tracking-[0.12em] text-gray-500">
         {label}
       </p>
@@ -206,7 +208,7 @@ function PriorityBadge({
     <span
       className={cn(
         "inline-flex items-center justify-center rounded-full border font-bold uppercase tracking-[0.08em]",
-        compact ? "min-w-10 px-2 py-1 text-[10px]" : "px-3 py-1.5 text-[11px]",
+        compact ? "min-w-[46px] px-2.5 py-1.5 text-[12px]" : "px-3.5 py-2 text-[12px]",
         classes[priority]
       )}
     >
@@ -235,7 +237,7 @@ function IncidentTable({
   resolvingIncidentId?: string | null
 }) {
   return (
-    <div className={cn("bg-white", isResolved && "opacity-70")}>
+    <div className={cn("bg-white", isResolved && "opacity-80")}>
       {isResolved && listStatus === "loading" && (
         <div className="space-y-3 px-8 py-4">
           {[0, 1, 2].map((item) => (
@@ -254,111 +256,111 @@ function IncidentTable({
         </div>
       )}
       {/* Rows */}
-      {listStatus !== "error" && incidents.map((incident, index) => (
-        <div
-          key={`${isResolved ? "resolved" : "active"}-${incident.id}-${index}`}
-          onClick={() => onSelectIncident(incident)}
-          className={cn(
-            "kairo-stage-in grid min-h-[76px] cursor-pointer grid-cols-[18px_minmax(160px,1fr)_44px_104px_76px_72px_86px_56px] items-center gap-3 border-b border-gray-100 px-8 py-4 transition-colors",
-            incident.status === "live" && incident.severity === "critical" && "border-l-4 border-l-[#EE4444] hover:bg-[#FAFAFA]",
-            incident.status === "live" && incident.severity === "warning" && "border-l-4 border-l-[#F59E0B] hover:bg-[#FAFAFA]",
-            incident.status === "resolved" && "hover:bg-[#FAFAFA]"
-          )}
-        >
-          {/* Status Dot */}
-          <div>
+      {listStatus !== "error" && incidents.length > 0 && (
+        <div>
+          {incidents.map((incident, index) => (
             <div
+              key={`${isResolved ? "resolved" : "active"}-${incident.id}-${index}`}
+              onClick={() => onSelectIncident(incident)}
               className={cn(
-                "h-2.5 w-2.5 rounded-full",
-                incident.status === "live" && incident.severity === "critical" && "bg-[#EE4444]",
-                incident.status === "live" && incident.severity === "warning" && "bg-[#F59E0B]",
-                incident.status === "resolved" && "bg-[#00A651]"
-              )}
-            />
-          </div>
-
-          {/* Name */}
-          <div className="truncate text-[15px] font-semibold leading-6 text-gray-900">
-            {incident.name}
-          </div>
-
-          {/* Priority */}
-          <div>
-            <PriorityBadge priority={getPriorityForDisplayIncident(incident)} compact />
-          </div>
-
-          {/* Vendor */}
-          <div className="min-w-0">
-            <span className="inline-flex max-w-full items-center gap-2 truncate rounded-lg bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 border border-gray-100">
-              <VendorLogo vendor={incident.vendor} size="sm" />
-              <span className="truncate">{incident.vendor}</span>
-            </span>
-          </div>
-
-          {/* Status */}
-          <div>
-            <span
-              className={cn(
-                "inline-flex min-w-[88px] justify-center rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.05em]",
-                incident.status === "live" && incident.severity === "critical" && "bg-[#EE4444]/15 text-[#EE4444]",
-                incident.status === "live" && incident.severity === "warning" && "bg-[#F59E0B]/15 text-[#F59E0B]",
-                incident.status === "resolved" && "bg-[#00A651]/10 text-[#00A651]"
+                "kairo-stage-in grid min-h-[96px] cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-5 border-b border-gray-100 px-8 py-5 transition-colors",
+                incident.status === "live" && incident.severity === "critical" && "border-l-4 border-l-[#EE4444] hover:bg-[#FAFAFA]",
+                incident.status === "live" && incident.severity === "warning" && "border-l-4 border-l-[#F59E0B] hover:bg-[#FAFAFA]",
+                incident.status === "resolved" && "hover:bg-[#FAFAFA]"
               )}
             >
-              {incident.status === "live"
-                ? "Live"
-                : isResolved && incident.time !== "Resolved now"
-                  ? "Memory"
-                  : "Resolved"}
-            </span>
-          </div>
+              {/* Status Dot */}
+              <div>
+                <div
+                  className={cn(
+                    "h-2.5 w-2.5 rounded-full",
+                    incident.status === "live" && incident.severity === "critical" && "bg-[#EE4444]",
+                    incident.status === "live" && incident.severity === "warning" && "bg-[#F59E0B]",
+                    incident.status === "resolved" && "bg-[#00A651]"
+                  )}
+                />
+              </div>
 
-          {/* Time */}
-          <div className="truncate text-[13px] font-medium text-gray-500">{incident.time}</div>
+              <div className="min-w-0 space-y-3">
+                {/* Name */}
+                <div className="min-w-0 pr-2 text-[16px] font-semibold leading-6 text-gray-900">
+                  <span className="line-clamp-2">{incident.name}</span>
+                </div>
 
-          {/* Memory Matches */}
-          <div>
-            <span
-              className={cn(
-                "inline-flex min-w-[82px] justify-center rounded-md border px-2 py-1.5 text-[10px] font-bold",
-                incident.status === "live" && memoryStatus === "loading"
-                  ? "border-gray-200 bg-gray-50 text-gray-400"
-                  : incident.memoryMatches > 0
-                    ? "border-blue-600 bg-white text-blue-600"
-                    : "border-gray-200 bg-white text-gray-400"
-              )}
-            >
-              {incident.status === "live" && memoryStatus === "loading"
-                ? "…"
-                : `${incident.memoryMatches} ${incident.memoryMatches === 1 ? "match" : "matches"}`}
-            </span>
-          </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
+                  {/* Priority */}
+                  <PriorityBadge priority={getPriorityForDisplayIncident(incident)} compact />
 
-          {/* Actions */}
-          <div className="flex justify-center">
-            <button
-              onClick={(event) => {
-                event.stopPropagation()
-                if (incident.status === "live") onResolveIncident(incident)
-              }}
-              disabled={incident.status !== "live" || resolvingIncidentId === incident.id}
-              className={cn(
-                "flex h-7 min-w-[54px] items-center justify-center rounded border px-2 text-[10px] font-semibold transition-colors",
-                incident.status === "live"
-                  ? "border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100"
-                  : "border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-900",
-                resolvingIncidentId === incident.id && "cursor-not-allowed opacity-60"
-              )}
-            >
-              {incident.status === "live"
-                ? resolvingIncidentId === incident.id
-                  ? "Saving"
-                  : "Resolve"
-                : <MoreHorizontal className="h-4 w-4" />}
-            </button>
-          </div>
+                  {/* Vendor */}
+                  <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2 text-[13px] font-semibold text-gray-600">
+                    <VendorLogo vendor={incident.vendor} size="sm" />
+                    <span className="min-w-0 truncate">{incident.vendor}</span>
+                  </span>
+
+                  {/* Status */}
+                  <span
+                    className={cn(
+                      "inline-flex min-w-[98px] justify-center rounded-md px-3.5 py-2 text-[12px] font-bold uppercase tracking-[0.05em]",
+                      incident.status === "live" && incident.severity === "critical" && "bg-[#EE4444]/15 text-[#EE4444]",
+                      incident.status === "live" && incident.severity === "warning" && "bg-[#F59E0B]/15 text-[#F59E0B]",
+                      incident.status === "resolved" && "bg-[#00A651]/10 text-[#00A651]"
+                    )}
+                  >
+                    {incident.status === "live"
+                      ? "Live"
+                      : isResolved && incident.time !== "Resolved now"
+                        ? "Memory"
+                        : "Resolved"}
+                  </span>
+
+                  {/* Time */}
+                  <span className="text-[15px] font-medium leading-6 text-gray-500">{incident.time}</span>
+
+                  {/* Memory Matches */}
+                  <span
+                    className={cn(
+                      "inline-flex min-w-[112px] justify-center rounded-md border px-3 py-2 text-[12px] font-bold",
+                      incident.status === "live" && memoryStatus === "loading"
+                        ? "border-gray-200 bg-gray-50 text-gray-400"
+                        : incident.memoryMatches > 0
+                          ? "border-blue-600 bg-white text-blue-600"
+                          : "border-gray-200 bg-white text-gray-400"
+                    )}
+                  >
+                    {incident.status === "live" && memoryStatus === "loading"
+                      ? "…"
+                      : `${incident.memoryMatches} ${incident.memoryMatches === 1 ? "match" : "matches"}`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-center">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (incident.status === "live") onResolveIncident(incident)
+                  }}
+                  disabled={incident.status !== "live" || resolvingIncidentId === incident.id}
+                  className={cn(
+                    "flex h-9 min-w-[72px] items-center justify-center rounded-md border px-3 text-[12px] font-semibold transition-colors",
+                    incident.status === "live"
+                      ? "border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                      : "border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-900",
+                    resolvingIncidentId === incident.id && "cursor-not-allowed opacity-60"
+                  )}
+                >
+                  {incident.status === "live"
+                    ? resolvingIncidentId === incident.id
+                      ? "Saving"
+                      : "Resolve"
+                    : <MoreHorizontal className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   )
 }

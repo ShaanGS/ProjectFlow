@@ -50,20 +50,22 @@ export function KairoConsole({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <section className="relative h-full w-[min(1180px,calc(100vw-28px))] overflow-hidden border-l border-gray-200 bg-white shadow-2xl transition-transform duration-300">
+      <section className="kairo-console-panel relative h-full w-[min(1120px,calc(100vw-24px))] overflow-hidden border-l border-gray-200 bg-white shadow-2xl transition-transform duration-300">
         <div className="flex h-full flex-col">
-          <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-gray-100 bg-white px-7">
+          <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-7">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-teal-100 bg-teal-50">
                 <Brain className="h-4 w-4 text-teal-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-teal-700">
+                <h2 className="text-[18px] font-bold leading-tight tracking-tight text-gray-950">
                   Kairo Console
-                </p>
-                <h2 className="truncate text-[20px] font-bold leading-tight tracking-tight text-gray-950">
-                  {activeIncident?.title ?? "Incident intelligence workspace"}
                 </h2>
+                {activeIncident && (
+                  <p className="mt-0.5 max-w-[560px] truncate text-[13px] font-medium leading-5 text-gray-500">
+                    {activeIncident.title}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
